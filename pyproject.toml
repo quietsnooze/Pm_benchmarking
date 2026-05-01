@@ -1,0 +1,40 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "uk_stress_benchmark"
+version = "0.1.0"
+description = "UK bank stress-test benchmarking against Bank of England ACS scenarios."
+requires-python = ">=3.12"
+dependencies = [
+    "streamlit",
+    "pandas",
+    "plotly",
+    "statsmodels",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "ruff",
+    "pyright",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.pyright]
+include = ["src", "tests"]
+typeCheckingMode = "basic"
+pythonVersion = "3.12"
