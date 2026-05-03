@@ -19,7 +19,13 @@ dev = [
     "pytest",
     "ruff",
     "pyright",
+    "pdfplumber>=0.11.9",
 ]
+
+[project.scripts]
+sync-sources = "uk_stress_benchmark.sync_sources:main"
+extract-tables = "uk_stress_benchmark.extract_appendix_tables:main"
+ingest = "uk_stress_benchmark.ingest:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
@@ -33,6 +39,11 @@ target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.ruff.lint.per-file-ignores]
+# Test fixtures often hold verbatim source-data lines that legitimately exceed
+# the line-length budget; relaxing E501 there keeps the fixture faithful.
+"tests/**" = ["E501"]
 
 [tool.pyright]
 include = ["src", "tests"]

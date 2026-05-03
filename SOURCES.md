@@ -2,7 +2,7 @@
 
 Raw source files for `raw_inputs/` are kept locally only (gitignored). This file records where each one came from so the workspace can be reconstructed on a fresh machine. Update it whenever a raw file is added or replaced.
 
-URLs are not committed unless verified — most public regulatory data lives behind landing pages that move year-to-year. For each entry, search the publisher's site by the title or filename rather than relying on a URL.
+The **[Verified direct URLs](#verified-direct-urls)** section near the bottom is machine-readable: running `python -m uk_stress_benchmark.sync_sources` parses each `` - `filename` -> <url> `` bullet and downloads any file not already present in `raw_inputs/`. Catalogue tables above are documentation only — extend them when you need a place to record provenance, but the downloader only reads the verified-URLs list.
 
 ## Bank of England — concurrent stress-test scenarios
 
@@ -12,7 +12,7 @@ Published annually alongside the BoE concurrent stress-test exercise. Source: ba
 | --- | --- | --- |
 | `stress-testing-the-uk-banking-system-variable-paths-for-the-2014-scenario.xlsx` | 2014 | ACS scenario macro variable paths |
 | `stress-testing-the-uk-banking-system-variable-paths-for-the-2015-scenario.xlsx` | 2015 | |
-| `variable-paths-for-the-2016-stress-test.xlsx` | 2016 | |
+| `variable-paths-for-the-2016-stress-test.xlsx` | 2016 | naming changed for 2016 only |
 | `stress-testing-the-uk-banking-system-variable-paths-for-the-2017-scenario.xlsx` | 2017 | |
 | `stress-testing-the-uk-banking-system-variable-paths-for-the-2018-scenario.xlsx` | 2018 | |
 | `stress-testing-the-uk-banking-system-variable-paths-for-the-2019-scenario.xlsx` | 2019 | |
@@ -20,9 +20,8 @@ Published annually alongside the BoE concurrent stress-test exercise. Source: ba
 | `stress-testing-the-uk-banking-system-2014-results.pdf` … `-2017-results.pdf` | 2014–2017 | Annual results commentaries |
 | `november-2018.pdf` | 2018 | BoE Financial Stability Report (containing 2018 stress-test results) |
 | `december-2019.pdf` | 2019 | BoE FSR with 2019 stress-test results |
-| `mlar-longrun-detailed.xlsx` | — | Long-run Mortgage Lenders & Administrators Return data |
-| `effectiveness-of-stresstesting-model-risk-management.pdf` | — | BoE working/staff paper |
-| `mortgages-estimating-default-correlation-and-forecasting-default-risk.pdf` | — | BoE working/staff paper |
+| `effectiveness-of-stresstesting-model-risk-management.pdf` | — | BoE paper on stress-testing model risk management — exact publication not yet identified |
+| `mortgages-estimating-default-correlation-and-forecasting-default-risk.pdf` | 2018 | BoE Staff Working Paper No. 708 |
 
 ## European Banking Authority — EU-wide stress test & transparency exercise
 
@@ -62,8 +61,32 @@ Each firm publishes its own. Source: investor-relations pages of the relevant fi
 | `2014_lbg_fy_results_excel_download_updated.numbers` | Lloyds Banking Group | FY 2014 results |
 | `2019 provisions coverage by firm.xlsx` | (compilation) | Provisions coverage extracted from multiple firms' Pillar 3 |
 | `hsbc ltv calculator.xlsx` | HSBC | LTV calculator |
-| `HSBC 2018 CREL ltv profile UK.xlsx` | HSBC | 2018 UK CRE LTV profile |
 | `standard-chartered-plc-full-year-2019-data-pack.xlsx` | Standard Chartered | FY 2019 data pack |
+
+## Verified direct URLs
+
+The downloader (`python -m uk_stress_benchmark.sync_sources`) parses the bullet list below. Each line of the form ``- `filename.ext` -> <https://...>`` is treated as a directive to ensure that filename exists at `raw_inputs/<filename>`. Adding entries here is how new files get auto-fetched.
+
+- `stress-testing-the-uk-banking-system-2014-results.pdf` → <https://www.bankofengland.co.uk/-/media/boe/files/stress-testing/2014/stress-testing-the-uk-banking-system-2014-results.pdf>
+- `stress-testing-the-uk-banking-system-2015-results.pdf` → <https://www.bankofengland.co.uk/-/media/boe/files/stress-testing/2015/stress-testing-the-uk-banking-system-2015-results.pdf>
+- `stress-testing-the-uk-banking-system-2016-results.pdf` → <https://www.bankofengland.co.uk/-/media/boe/files/stress-testing/2016/stress-testing-the-uk-banking-system-2016-results.pdf>
+- `stress-testing-the-uk-banking-system-2017-results.pdf` → <https://www.bankofengland.co.uk/-/media/boe/files/stress-testing/2017/stress-testing-the-uk-banking-system-2017-results.pdf>
+- `stress-testing-the-uk-banking-system-variable-paths-for-the-2014-scenario.xlsx` → <https://www.bankofengland.co.uk/-/media/boe/files/stress-testing/2014/stress-testing-the-uk-banking-system-variable-paths-for-the-2014-scenario.xlsx>
+- `stress-testing-the-uk-banking-system-variable-paths-for-the-2015-scenario.xlsx` → <https://www.bankofengland.co.uk/-/media/boe/files/stress-testing/2015/stress-testing-the-uk-banking-system-variable-paths-for-the-2015-scenario.xlsx>
+- `variable-paths-for-the-2016-stress-test.xlsx` → <https://www.bankofengland.co.uk/-/media/boe/files/stress-testing/2016/variable-paths-for-the-2016-stress-test.xlsx>
+- `stress-testing-the-uk-banking-system-variable-paths-for-the-2017-scenario.xlsx` → <https://www.bankofengland.co.uk/-/media/boe/files/stress-testing/2017/stress-testing-the-uk-banking-system-variable-paths-for-the-2017-scenario.xlsx>
+- `stress-testing-the-uk-banking-system-variable-paths-for-the-2018-scenario.xlsx` → <https://www.bankofengland.co.uk/-/media/boe/files/stress-testing/2018/stress-testing-the-uk-banking-system-variable-paths-for-the-2018-scenario.xlsx>
+- `stress-testing-the-uk-banking-system-variable-paths-for-the-2019-scenario.xlsx` → <https://www.bankofengland.co.uk/-/media/boe/files/stress-testing/2019/stress-testing-the-uk-banking-system-variable-paths-for-the-2019-scenario.xlsx>
+- `variable-paths-for-firms-not-participating-in-2019-concurrent-stress-test.XLSX` → <https://www.bankofengland.co.uk/-/media/boe/files/stress-testing/2019/variable-paths-for-firms-not-participating-in-2019-concurrent-stress-test.xlsx>
+- `november-2018.pdf` → <https://www.bankofengland.co.uk/-/media/boe/files/financial-stability-report/2018/november-2018.pdf>
+- `december-2019.pdf` → <https://www.bankofengland.co.uk/-/media/boe/files/financial-stability-report/2019/december-2019.pdf>
+- `mortgages-estimating-default-correlation-and-forecasting-default-risk.pdf` → <https://www.bankofengland.co.uk/-/media/boe/files/working-paper/2018/mortgages-estimating-default-correlation-and-forecasting-default-risk.pdf>
+
+### URL not yet identified
+
+Files referenced in the legacy folder for which the corresponding BoE publication has not been confirmed. The downloader skips these (no URL on the line):
+
+- `effectiveness-of-stresstesting-model-risk-management.pdf` — likely either SS3/18 *Model risk management principles for stress testing* (PRA, 2018) or a renamed copy of the 2019 *Effectiveness of stress testing framework and its implementation* paper. To resolve, open the local PDF and check its title/cover page.
 
 ## TBD — origin not confirmed
 

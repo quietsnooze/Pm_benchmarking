@@ -26,6 +26,18 @@ Python project, managed with **uv**. Migrated from pip on 2026-05-01 once Pete w
 | Update a single dependency | `uv lock --upgrade-package <pkg>` |
 | Re-resolve everything | `uv lock --upgrade` |
 
+### Data ingest commands
+
+The data pipeline is split into two idempotent steps plus an "all" wrapper, all exposed as console scripts via `[project.scripts]` in `pyproject.toml`:
+
+| Purpose | Command |
+| --- | --- |
+| Download raw inputs declared in [SOURCES.md](SOURCES.md) into `raw_inputs/` | `uv run sync-sources` |
+| Parse BoE results-PDF impairment-charge tables to CSVs in `processed_inputs/` | `uv run extract-tables` |
+| Both, in order — equivalent to a "build" of `processed_inputs/` from scratch | `uv run ingest` |
+
+`raw_inputs/` is gitignored (raw files reproducible from `SOURCES.md`); `processed_inputs/` **is** committed so a fresh clone has the analysis-ready CSVs without needing to re-run ingest.
+
 `uv run` automatically syncs the venv before each command, so there's no separate "activate" step. Activating the venv manually (`.venv\Scripts\Activate.ps1`) still works if you want to call binaries directly.
 
 **Streamlit Community Cloud deploy:** if SCC doesn't pick up `uv.lock` directly, export pinned requirements with `uv export --no-dev -o requirements.txt` and commit (or generate at deploy time).
