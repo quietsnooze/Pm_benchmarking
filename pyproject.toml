@@ -20,11 +20,13 @@ dev = [
     "ruff",
     "pyright",
     "pdfplumber>=0.11.9",
+    "openpyxl>=3.1.5",
 ]
 
 [project.scripts]
 sync-sources = "uk_stress_benchmark.sync_sources:main"
 extract-tables = "uk_stress_benchmark.extract_appendix_tables:main"
+extract-scenarios = "uk_stress_benchmark.extract_scenarios:main"
 ingest = "uk_stress_benchmark.ingest:main"
 
 [tool.setuptools.packages.find]
