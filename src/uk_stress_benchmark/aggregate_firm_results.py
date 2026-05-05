@@ -63,6 +63,22 @@ _TABLE_MAPPINGS: dict[tuple[str, str], dict[str, str]] = {
         "col_3": "uk_cre_5yr_ic_pct",
         "col_4": "uk_bus_5yr_ic_pct",
     },
+    # 2018 stress-test results were published inside the November 2018 FSR
+    # under "Annex 5"; same per-firm × per-product shape as 2017 Table A5.A.
+    ("2018", "A5A"): {
+        "col_1": "uk_mort_5yr_ic_pct",
+        "col_2": "uk_retail_5yr_ic_pct",
+        "col_3": "uk_cre_5yr_ic_pct",
+        "col_4": "uk_bus_5yr_ic_pct",
+    },
+    # 2019 results were published inside the December 2019 FSR under
+    # "Annex 4" (renumbered from A5 to A4); same shape as 2018 Table A5.A.
+    ("2019", "A4A"): {
+        "col_1": "uk_mort_5yr_ic_pct",
+        "col_2": "uk_retail_5yr_ic_pct",
+        "col_3": "uk_cre_5yr_ic_pct",
+        "col_4": "uk_bus_5yr_ic_pct",
+    },
 }
 
 # Firm-name canonicalisation. BoE drops "Group" off "The Royal Bank of

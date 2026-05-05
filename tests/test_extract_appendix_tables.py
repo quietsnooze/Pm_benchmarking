@@ -1,4 +1,11 @@
-from uk_stress_benchmark.extract_appendix_tables import parse_table_block
+from pathlib import Path
+
+import pytest
+
+from uk_stress_benchmark.extract_appendix_tables import (
+    extract_appendix_tables,
+    parse_table_block,
+)
 
 # Hand-typed fixture mirroring the structure of the 2015 Table 2B block, with
 # multi-firm names, the £ unit line, multi-line wrapped headers, and a
@@ -72,3 +79,31 @@ def test_parse_returns_none_when_block_does_not_start_with_table_header():
 
 def test_parse_returns_none_for_empty_block():
     assert parse_table_block([]) is None
+
+
+# -----------------------------------------------------------------------------
+# Integration: 2018 FSR contains the same impairment-charge annex as the
+# 2014–2017 results PDFs, but typesets the heading with a U+2011 non-breaking
+# hyphen ("bank‑specific") instead of a regular hyphen. The annex regex must
+# match both forms; this test runs only when the real PDF is available.
+# -----------------------------------------------------------------------------
+
+_REPO_ROOT = Path(__file__).resolve().parents[1]
+_FSR_2018 = _REPO_ROOT / "raw_inputs" / "november-2018.pdf"
+
+
+@pytest.mark.skipif(
+    not _FSR_2018.exists(),
+    reason="raw_inputs/november-2018.pdf not present (run `uv run sync-sources`)",
+)
+def test_extracts_2018_fsr_annex_5_impairment_charge_tables(tmp_path):
+    report = extract_appendix_tables(_FSR_2018, tmp_path)
+
+    titles = [t.title.lower() for t in report.tables]
+    assert any("impairment charge" in title for title in titles), (
+        f"expected an impairment-charge table in 2018 FSR; got titles={titles}"
+    )
+    table_ids = [t.table_id for t in report.tables]
+    assert any(tid.startswith("A5") for tid in table_ids), (
+        f"expected at least one A5.* table from 2018 FSR; got ids={table_ids}"
+    )

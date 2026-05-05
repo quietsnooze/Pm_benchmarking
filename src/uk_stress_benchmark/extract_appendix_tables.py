@@ -52,9 +52,22 @@ _FIRM_RE = re.compile(
     r"^(?P<firm>" + "|".join(re.escape(f) for f in _FIRMS) + r")(?:\s+(?P<rest>.*))?$"
 )
 
-# Annex heading we look for. Matches both 2014's "FIRM-SPECIFIC" variant and
-# the "bank-specific" wording used 2015 onwards.
-_ANNEX_RE = re.compile(r"(?i)(?:bank|firm)-specific projected impairment charges")
+# Annex heading we look for. Anchored to start of line ("^\\s*Annex N") so
+# we match the actual section heading (e.g. "Annex 4: 2019 annual cyclical
+# scenario: bank‑specific projected impairment charges...") rather than the
+# running page banner the 2019 FSR repeats at the top of every annex page
+# (which begins with "Financial Stability Report ..." and contains the same
+# phrase). Variations handled:
+# - 2014 uses "ANNEX 2: FIRM-SPECIFIC" while later years use "Annex N:
+#   bank-specific";
+# - 2018/2019 FSRs typeset a U+2011 non-breaking hyphen ("bank‑specific")
+#   instead of an ASCII hyphen;
+# - the 2019 FSR breaks the heading across two lines between "projected"
+#   and "impairment charges", so the inter-word spacing accepts any
+#   whitespace (including newlines).
+_ANNEX_RE = re.compile(
+    r"(?im)^\s*Annex\s+\d+\b[^\n]*?(?:bank|firm)[-‑]specific\s+projected\s+impairment\s+charges"
+)
 
 # Table title: "Table 1: ..." (2014), "Table 2A ..." (2015/16),
 # "Table A5.C ..." (2017). Captures the id (alphanumerics + dot) and title.
@@ -250,7 +263,14 @@ def main() -> None:
     repo_root = Path(__file__).resolve().parents[2]
     raw_dir = repo_root / "raw_inputs"
     out_dir = repo_root / "processed_inputs"
-    pdfs = sorted(raw_dir.glob("stress-testing-the-uk-banking-system-*-results.pdf"))
+    # Two sources of the impairment-charge annex: the 2014–2017 dedicated
+    # results PDFs and the 2018/2019 Financial Stability Reports, which carry
+    # the 2018 ACS / 2019 ACS results inside.
+    pdfs = sorted(
+        list(raw_dir.glob("stress-testing-the-uk-banking-system-*-results.pdf"))
+        + list(raw_dir.glob("november-2018.pdf"))
+        + list(raw_dir.glob("december-2019.pdf"))
+    )
     if not pdfs:
         print(f"No matching results PDFs in {raw_dir}")
         return
