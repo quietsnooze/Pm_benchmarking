@@ -88,6 +88,14 @@ Files referenced in the legacy folder for which the corresponding BoE publicatio
 
 - `effectiveness-of-stresstesting-model-risk-management.pdf` — likely either SS3/18 *Model risk management principles for stress testing* (PRA, 2018) or a renamed copy of the 2019 *Effectiveness of stress testing framework and its implementation* paper. To resolve, open the local PDF and check its title/cover page.
 
+## Local-only data (not downloadable)
+
+These files have no public URL — they're hand-compiled summaries Pete put together from individual firms' Pillar 3 / annual-report disclosures. The transcribed CSVs in `processed_inputs/` are the committed source of truth; the source XLSXs live only in `old_version/` (gitignored) on Pete's machine.
+
+| Source XLSX | Transcription script | Output CSV | Provides |
+| --- | --- | --- | --- |
+| `old_version/stress test benchmarks/pillar 3 disclosures/2019 provisions coverage by firm.xlsx` | [scripts/derive_firm_provisions.py](scripts/derive_firm_provisions.py) | `processed_inputs/firm_provisions.csv` | `firm_name`, `mort_prov_coverage`, `retail_prov_coverage`, `commercial_prov_coverage` for each of the seven UK banks. SCB has only `commercial_prov_coverage` populated (a flagged "guesstimate" in the source). |
+
 ## TBD — origin not confirmed
 
 These appeared in the legacy folder; original source is not recorded. Pete to fill in:
