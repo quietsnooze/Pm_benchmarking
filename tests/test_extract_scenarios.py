@@ -61,3 +61,51 @@ def test_handles_quarter_padding_variants():
     cleaned = clean_scenario_frame(df)
     assert list(cleaned["quarter"]) == ["Q1 2000", "Q2  2001", "Q3\t2002"]
     assert "noise" not in cleaned["quarter"].values
+
+
+def test_recognises_2014_stress_scenario_divider():
+    # The 2014 BoE workbook uses "Stress scenario" (with trailing space)
+    # instead of "Projections". Same semantics — the cleaned frame should
+    # mark history / year_zero / projection accordingly.
+    df = pd.DataFrame(
+        {
+            "Unnamed: 0": [
+                "Historical data",
+                "Q3 2013",
+                "Q4 2013",
+                "Stress scenario ",
+                "Q1 2014",
+            ],
+            "UK real GDP": [None, 99, 100, None, 95],
+        }
+    )
+    cleaned = clean_scenario_frame(df)
+    assert list(cleaned["period_kind"]) == ["history", "year_zero", "projection"]
+
+
+def test_assigns_period_kind_around_projections_divider():
+    # Real BoE sheets are: "Historical data", quarter rows, "Projections" divider,
+    # more quarter rows. The cleaned frame should label history vs projection,
+    # and tag the last history row as year_zero (the T0 used as denominator
+    # for low-point shock calculations).
+    df = pd.DataFrame(
+        {
+            "Unnamed: 0": [
+                "Historical data",
+                "Q1 2017",
+                "Q2 2017",
+                "Projections",
+                "Q3 2017",
+                "Q4 2017",
+            ],
+            "UK real GDP": [None, 100, 101, None, 102, 103],
+        }
+    )
+    cleaned = clean_scenario_frame(df)
+    assert list(cleaned["quarter"]) == ["Q1 2017", "Q2 2017", "Q3 2017", "Q4 2017"]
+    assert list(cleaned["period_kind"]) == [
+        "history",
+        "year_zero",
+        "projection",
+        "projection",
+    ]
