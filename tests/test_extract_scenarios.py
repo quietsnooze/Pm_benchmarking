@@ -1,6 +1,10 @@
 import pandas as pd
+import pytest
 
-from uk_stress_benchmark.extract_scenarios import clean_scenario_frame
+from uk_stress_benchmark.extract_scenarios import (
+    add_uk_nominal_gdp_index,
+    clean_scenario_frame,
+)
 
 
 def test_keeps_only_quarter_anchored_rows():
@@ -61,6 +65,43 @@ def test_handles_quarter_padding_variants():
     cleaned = clean_scenario_frame(df)
     assert list(cleaned["quarter"]) == ["Q1 2000", "Q2  2001", "Q3\t2002"]
     assert "noise" not in cleaned["quarter"].values
+
+
+def test_adds_uk_nominal_gdp_index_rebased_to_year_zero_equals_100():
+    # The legacy R built uk_nominal_gdp_index in st_build_scenarios by
+    # rebasing UK nominal GDP so the year_zero quarter == 100. Here that
+    # derivation lives in extract_scenarios so every scenario CSV carries
+    # the column directly.
+    df = pd.DataFrame(
+        {
+            "quarter": ["Q3 2016", "Q4 2016", "Q1 2017", "Q2 2017"],
+            "period_kind": ["history", "year_zero", "projection", "projection"],
+            "UK nominal GDP": [490_000.0, 500_000.0, 450_000.0, 525_000.0],
+        }
+    )
+    out = add_uk_nominal_gdp_index(df)
+    assert "UK nominal GDP index" in out.columns
+    assert out.loc[0, "UK nominal GDP index"] == pytest.approx(98.0)
+    assert out.loc[1, "UK nominal GDP index"] == pytest.approx(100.0)
+    assert out.loc[2, "UK nominal GDP index"] == pytest.approx(90.0)
+    assert out.loc[3, "UK nominal GDP index"] == pytest.approx(105.0)
+
+
+def test_add_uk_nominal_gdp_index_is_noop_when_source_column_missing():
+    # 2014's BoE workbook is fine (UK nominal GDP is renamed in via the
+    # column-rename map) but defensive: if a future workbook lacks the
+    # source column, the helper should leave the frame alone rather than
+    # crash.
+    df = pd.DataFrame(
+        {
+            "quarter": ["Q4 2016", "Q1 2017"],
+            "period_kind": ["year_zero", "projection"],
+            "Some other variable": [1.0, 2.0],
+        }
+    )
+    out = add_uk_nominal_gdp_index(df)
+    assert "UK nominal GDP index" not in out.columns
+    assert list(out.columns) == ["quarter", "period_kind", "Some other variable"]
 
 
 def test_recognises_2014_stress_scenario_divider():

@@ -17,14 +17,6 @@ from pathlib import Path
 
 import pandas as pd
 
-# Variables that aren't published directly by BoE but are derived in this
-# module by rebasing a published series so year_zero == 100. Mathematically
-# their pct_fall / pct_rise equal those of the source column; the alias
-# exists so the legacy R feature set can be reproduced verbatim.
-_DERIVED_INDICES: dict[str, str] = {
-    "UK nominal GDP index": "UK nominal GDP",
-}
-
 # Input aliases: map a canonical analysis name to the actual CSV column.
 # The BoE workbooks publish "Bank Rate" without the UK prefix, but the
 # legacy R analysis named the feature uk_bank_rate. Accepting the
@@ -49,11 +41,14 @@ def compute_low_point_shocks(
     df : pd.DataFrame
         Tidy scenario frame with a ``period_kind`` column. Must contain
         exactly one ``year_zero`` row plus zero-or-more ``projection`` rows.
-        ``history`` rows are ignored.
+        ``history`` rows are ignored. Derived columns such as
+        ``UK nominal GDP index`` are expected to be already present —
+        the ingest layer (:mod:`uk_stress_benchmark.extract_scenarios`)
+        adds them.
     variables : list[str]
         Column names (in canonical BoE casing, e.g. ``"UK nominal GDP"``) to
-        compute shocks for. May include the derived alias
-        ``"UK nominal GDP index"`` even though it isn't a column in ``df``.
+        compute shocks for. Variables whose column is absent from ``df``
+        come back as NaN rather than raising.
 
     Returns
     -------
@@ -61,16 +56,8 @@ def compute_low_point_shocks(
         Indexed by ``{snake_var}_pct_fall`` and ``{snake_var}_pct_rise`` for
         each variable. Values are signed: pct_fall is <= 0, pct_rise is >= 0.
     """
-    df = df.copy()
-    yz_mask = df["period_kind"] == "year_zero"
-
-    for derived, source in _DERIVED_INDICES.items():
-        if derived in variables and source in df.columns:
-            yz_source = df.loc[yz_mask, source].iloc[0]
-            df[derived] = df[source] / yz_source * 100
-
     relevant = df[df["period_kind"].isin(["year_zero", "projection"])]
-    year_zero = df.loc[yz_mask].iloc[0]
+    year_zero = df[df["period_kind"] == "year_zero"].iloc[0]
 
     shocks: dict[str, float] = {}
     for var in variables:

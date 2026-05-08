@@ -8,8 +8,9 @@ sheet(s); this module does the same, flattening each relevant sheet into one
 CSV per scenario in ``processed_inputs/``.
 
 Public surface:
-    extract_scenario(xlsx_path, out_dir) -> list[Path]
-    clean_scenario_frame(df)             -> pd.DataFrame   (testable helper)
+    extract_scenario(xlsx_path, out_dir)   -> list[Path]
+    clean_scenario_frame(df)               -> pd.DataFrame   (testable helper)
+    add_uk_nominal_gdp_index(df)           -> pd.DataFrame   (testable helper)
 
 The sheet name, header-row index, and output filename are pinned per-workbook
 in the ``_CONFIGS`` table below — BoE's column ordering and sheet naming
@@ -155,6 +156,30 @@ def clean_scenario_frame(df: pd.DataFrame) -> pd.DataFrame:
     return out
 
 
+def add_uk_nominal_gdp_index(df: pd.DataFrame) -> pd.DataFrame:
+    """Add a ``UK nominal GDP index`` column rebased so year_zero == 100.
+
+    Mirrors the legacy R ``st_build_scenarios`` step that derived
+    ``uk_nominal_gdp_index = uk_nominal_gdp / first(uk_nominal_gdp) * 100``
+    so the rebased series could be fed to the cross-year regression. Doing
+    this in the ingest layer means every scenario CSV self-describes its
+    rebased index, instead of every analytical consumer having to repeat
+    the derivation.
+
+    No-ops (returns ``df`` unchanged) when the source column ``UK nominal
+    GDP`` is absent or no ``year_zero`` row is marked.
+    """
+    if "UK nominal GDP" not in df.columns or "period_kind" not in df.columns:
+        return df
+    yz_rows = df.loc[df["period_kind"] == "year_zero", "UK nominal GDP"]
+    if yz_rows.empty:
+        return df
+    yz_value = yz_rows.iloc[0]
+    out = df.copy()
+    out["UK nominal GDP index"] = out["UK nominal GDP"] / yz_value * 100
+    return out
+
+
 def extract_scenario(xlsx_path: Path, out_dir: Path) -> list[Path]:
     """Extract every configured scenario sheet from ``xlsx_path`` to CSV.
 
@@ -172,6 +197,7 @@ def extract_scenario(xlsx_path: Path, out_dir: Path) -> list[Path]:
         cleaned = clean_scenario_frame(df)
         if sheet.column_renames:
             cleaned = cleaned.rename(columns=sheet.column_renames)
+        cleaned = add_uk_nominal_gdp_index(cleaned)
         out_path = out_dir / sheet.out_name
         cleaned.to_csv(out_path, index=False)
         written.append(out_path)

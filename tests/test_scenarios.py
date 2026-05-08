@@ -31,17 +31,18 @@ def test_pct_fall_and_pct_rise_relative_to_year_zero():
     assert shocks["uk_nominal_gdp_pct_rise"] == pytest.approx(0.10)
 
 
-def test_uk_nominal_gdp_index_is_derived_from_nominal_gdp():
-    # The index isn't published — it's a rebased version of UK nominal GDP
-    # with year_zero = 100. The legacy R built it for the regression. Asking
-    # for "UK nominal GDP index" should give the same shock values as the
-    # underlying nominal GDP (mathematically equivalent), but emit them under
-    # the index's slug.
+def test_uk_nominal_gdp_index_shocks_use_the_pre_derived_column():
+    # The rebased UK nominal GDP index column is added upstream by
+    # extract_scenarios.add_uk_nominal_gdp_index, so by the time
+    # compute_low_point_shocks sees the frame it's already there with
+    # year_zero == 100. This test confirms the shocks function reads that
+    # column directly — no in-module rebase.
     df = pd.DataFrame(
         {
             "quarter": ["Q4 2016", "Q1 2017"],
             "period_kind": ["year_zero", "projection"],
-            "UK nominal GDP": [500_000.0, 450_000.0],  # -10% from year_zero
+            "UK nominal GDP": [500_000.0, 450_000.0],
+            "UK nominal GDP index": [100.0, 90.0],
         }
     )
     shocks = compute_low_point_shocks(df, variables=["UK nominal GDP index"])
