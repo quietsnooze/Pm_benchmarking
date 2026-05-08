@@ -70,6 +70,10 @@ def test_real_data_low_point_shocks_match_legacy_r_gold():
     # using the canonical 7-variable feature set, and compare against the
     # legacy R output (eco_scenarios_low_point.csv). This guards against
     # methodology drift from the R port.
+    #
+    # Includes the legacy R's imputation step (corporate profits ~ nominal
+    # GDP) — without it, 2014's corporate profits would be NaN since the
+    # 2014 BoE workbook doesn't publish that variable.
     paths = {
         2014: PROCESSED / "scenario-2014-stress.csv",
         2015: PROCESSED / "scenario-2015-stress.csv",
@@ -87,7 +91,11 @@ def test_real_data_low_point_shocks_match_legacy_r_gold():
         "UK corporate profits",
         "UK Bank Rate",
     ]
-    mine = build_low_point_shocks(paths, variables=canonical_vars)
+    mine = build_low_point_shocks(
+        paths,
+        variables=canonical_vars,
+        impute={"UK corporate profits": ["UK nominal GDP"]},
+    )
 
     gold_path = (
         Path(__file__).resolve().parent.parent
@@ -97,17 +105,38 @@ def test_real_data_low_point_shocks_match_legacy_r_gold():
     )
     gold = pd.read_csv(gold_path).set_index("acsyear")
 
-    # 2014's BoE workbook doesn't publish UK corporate profits. The Python
-    # port honestly returns NaN; the legacy R emitted 0 / 0.1007... from a
-    # bind_rows column-union quirk (NA-padded values that summarise_if then
-    # filled in unexpectedly). Mask those two cells before comparing.
-    expected = gold.copy()
-    expected.loc[2014, "uk_corporate_profits_pct_fall"] = float("nan")
-    expected.loc[2014, "uk_corporate_profits_pct_rise"] = float("nan")
-
     pd.testing.assert_frame_equal(
-        mine[expected.columns], expected, check_dtype=False, atol=1e-10
+        mine[gold.columns], gold, check_dtype=False, atol=1e-10
     )
+
+
+def test_imputation_fills_2014_corporate_profits_via_nominal_gdp_regression():
+    # Without imputation: 2014's UK corporate profits is absent from the
+    # workbook, so its shock columns come back NaN. Enabling imputation
+    # fits a corporate-profits ~ nominal-GDP LM across the other years
+    # and projects values onto 2014, producing finite shocks.
+    paths = {
+        2014: PROCESSED / "scenario-2014-stress.csv",
+        2015: PROCESSED / "scenario-2015-stress.csv",
+        2016: PROCESSED / "scenario-2016-stress.csv",
+    }
+    vars_ = ["UK corporate profits"]
+
+    no_impute = build_low_point_shocks(paths, variables=vars_)
+    assert pd.isna(no_impute.loc[2014, "uk_corporate_profits_pct_fall"])
+    assert pd.isna(no_impute.loc[2014, "uk_corporate_profits_pct_rise"])
+
+    with_impute = build_low_point_shocks(
+        paths, variables=vars_, impute={"UK corporate profits": ["UK nominal GDP"]}
+    )
+    assert pd.notna(with_impute.loc[2014, "uk_corporate_profits_pct_fall"])
+    assert pd.notna(with_impute.loc[2014, "uk_corporate_profits_pct_rise"])
+    # 2015-2019 values were already observed and the imputation must not
+    # overwrite them — they should match the no-impute output exactly.
+    for year in (2015, 2016):
+        assert no_impute.loc[year, "uk_corporate_profits_pct_fall"] == pytest.approx(
+            with_impute.loc[year, "uk_corporate_profits_pct_fall"]
+        )
 
 
 def test_uk_bank_rate_alias_maps_to_bank_rate_column():

@@ -7,7 +7,7 @@ per-product impairment-charge regressions.
 
 Public surface:
     compute_low_point_shocks(df, *, variables) -> pd.Series
-    build_low_point_shocks(paths, *, variables) -> pd.DataFrame
+    build_low_point_shocks(paths, *, variables, impute=None) -> pd.DataFrame
 """
 
 from __future__ import annotations
@@ -16,6 +16,8 @@ import re
 from pathlib import Path
 
 import pandas as pd
+
+from uk_stress_benchmark.imputation import impute_missing_var
 
 # Input aliases: map a canonical analysis name to the actual CSV column.
 # The BoE workbooks publish "Bank Rate" without the UK prefix, but the
@@ -78,7 +80,10 @@ def compute_low_point_shocks(
 
 
 def build_low_point_shocks(
-    paths: dict[int, Path | str], *, variables: list[str]
+    paths: dict[int, Path | str],
+    *,
+    variables: list[str],
+    impute: dict[str, list[str]] | None = None,
 ) -> pd.DataFrame:
     """Compute low-point shocks for many scenarios and stack into one frame.
 
@@ -90,6 +95,12 @@ def build_low_point_shocks(
         :mod:`uk_stress_benchmark.extract_scenarios`.
     variables : list[str]
         Variable names passed through to :func:`compute_low_point_shocks`.
+    impute : dict[str, list[str]] | None
+        Optional ``{target_var: [predictor_vars]}`` describing imputations to
+        apply to the stacked quarterly time-series before computing shocks.
+        Mirrors the legacy R workflow's ``st_impute_missing_var`` step. Use
+        e.g. ``{"UK corporate profits": ["UK nominal GDP"]}`` to fill 2014's
+        missing corporate-profits column from nominal GDP.
 
     Returns
     -------
@@ -97,10 +108,34 @@ def build_low_point_shocks(
         Indexed by ``acsyear`` (sorted), with one column per
         ``{slug}_pct_fall`` / ``{slug}_pct_rise``.
     """
-    rows: dict[int, pd.Series] = {}
+    # Stack all scenarios with an acsyear tag so imputation can fit one
+    # cross-year LM (e.g. corporate profits ~ nominal GDP across 2015-2019)
+    # and project the result onto rows where the target column is missing
+    # (e.g. all of 2014).
+    frames: list[pd.DataFrame] = []
     for acsyear, path in paths.items():
         df = pd.read_csv(path)
-        rows[acsyear] = compute_low_point_shocks(df, variables=variables)
+        df = df.assign(acsyear=acsyear)
+        frames.append(df)
+    stacked = pd.concat(frames, ignore_index=True)
+
+    # Drop pre-T0 history rows before imputation. The legacy R's
+    # st_build_scenarios kept only year_zero + projection rows in the
+    # dataframe it fed to st_impute_missing_var, so the LM coefficients
+    # come from forecast-horizon data only. Filtering here matches that.
+    stacked = stacked[stacked["period_kind"].isin(["year_zero", "projection"])]
+
+    if impute:
+        for target, predictors in impute.items():
+            if target not in stacked.columns:
+                stacked[target] = pd.NA
+            stacked = impute_missing_var(
+                stacked, missing_var=target, based_on_vars=predictors
+            )
+
+    rows: dict[int, pd.Series] = {}
+    for acsyear, group in stacked.groupby("acsyear"):
+        rows[int(acsyear)] = compute_low_point_shocks(group, variables=variables)
     out = pd.DataFrame(rows).T.sort_index()
     out.index.name = "acsyear"
     return out
