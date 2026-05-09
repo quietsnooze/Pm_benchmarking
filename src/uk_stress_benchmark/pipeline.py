@@ -19,6 +19,7 @@ Public surface:
     ProductRecipe                         (frozen dataclass)
     RECIPES: dict[str, ProductRecipe]     ({"mortgage", "retail", "cre", "business"})
     fit_product_models(df, recipes=RECIPES) -> dict[str, RegressionResults]
+    predict_for_scenario(models, shock_values, firms_df) -> pd.DataFrame
 """
 
 from __future__ import annotations
@@ -28,7 +29,7 @@ from dataclasses import dataclass, field
 import pandas as pd
 from statsmodels.regression.linear_model import RegressionResults
 
-from uk_stress_benchmark.models import add_dummies, fit_linear_model
+from uk_stress_benchmark.models import add_dummies, fit_linear_model, predict_with_model
 
 # Universal default exclude — Standard Chartered is on the BoE list of UK
 # stress-test participants but its UK retail / mortgage book is too small
@@ -204,3 +205,49 @@ def fit_product_models(
             stepwise=recipe.stepwise,
         )
     return fitted
+
+
+def predict_for_scenario(
+    models: dict[str, RegressionResults],
+    shock_values: dict[str, float],
+    firms_df: pd.DataFrame,
+) -> pd.DataFrame:
+    """Predict per-firm impairment charges under a single hypothetical scenario.
+
+    Broadcasts the supplied ``shock_values`` across every firm in
+    ``firms_df`` and runs each fitted product model. The output is a tidy
+    table indexed by ``firm_name`` with one column per product.
+
+    Parameters
+    ----------
+    models : dict[str, RegressionResults]
+        Output of :func:`fit_product_models` — one fitted OLS per product.
+    shock_values : dict[str, float]
+        ``{shock_column_name: value}`` for the low-point shock features
+        (e.g. ``"uk_residential_property_price_index_pct_fall": -0.30``).
+        Keys not referenced by any model are harmless. Keys referenced by
+        a model but missing here will produce NaN predictions for that
+        product.
+    firms_df : pd.DataFrame
+        One row per firm carrying everything firm-level the models need:
+        the original ``firm_name`` column, the three ``*_prov_coverage``
+        columns, and the ``firm_name_*`` dummy columns produced by
+        :func:`uk_stress_benchmark.models.add_dummies`. Typically built by
+        ``modelling_df.drop_duplicates("firm_name")``.
+
+    Returns
+    -------
+    pd.DataFrame
+        Indexed by ``firm_name``, with one column per product key in
+        ``models``. Values are predicted impairment-charge percentages
+        for the supplied scenario.
+    """
+    scoring = firms_df.copy()
+    for col, val in shock_values.items():
+        scoring[col] = val
+
+    out = pd.DataFrame({"firm_name": scoring["firm_name"].values})
+    for product_name, model in models.items():
+        scored = predict_with_model(scoring, model)
+        out[product_name] = scored["prediction"].values
+    return out.set_index("firm_name")
