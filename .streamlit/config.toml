@@ -1,0 +1,16 @@
+# Portfolio-friendly defaults applied at deploy time.
+# - Light theme with a banking-blue primary accent for chart highlights / buttons.
+# - toolbarMode = "viewer" hides the developer hamburger menu (Settings,
+#   Get help, Report a bug) from visitors — Pete still sees the full toolbar
+#   when logged in as the app owner.
+# - usage-stats opt-out for visitor privacy.
+
+[theme]
+base = "light"
+primaryColor = "#1E40AF"
+
+[client]
+toolbarMode = "viewer"
+
+[browser]
+gatherUsageStats = false
