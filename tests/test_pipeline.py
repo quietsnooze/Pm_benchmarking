@@ -65,7 +65,7 @@ def test_build_modelling_dataset_inner_joins_results_shocks_provisions():
     df = build_modelling_dataset(_toy_results(), _toy_shocks(), _toy_provisions())
     # Standard Chartered excluded by default; remaining firms x acsyears
     # appear once each where data exists in all three sources.
-    assert set(zip(df["firm_name"], df["acsyear"])) == {
+    assert set(zip(df["firm_name"], df["acsyear"], strict=True)) == {
         ("Barclays", 2017),
         ("Barclays", 2018),
         ("HSBC", 2017),

@@ -175,7 +175,7 @@ with st.expander("Low-point shock features by ACS year", expanded=False):
 st.header("Fitted models")
 
 product_tabs = st.tabs([p.title() for p in fitted_models])
-for tab, (product, model) in zip(product_tabs, fitted_models.items()):
+for tab, (product, model) in zip(product_tabs, fitted_models.items(), strict=True):
     with tab:
         recipe = RECIPES[product]
         c1, c2 = st.columns(2)
