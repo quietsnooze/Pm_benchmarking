@@ -72,6 +72,19 @@ def test_real_data_low_point_shocks_match_legacy_r_gold():
     # Includes the legacy R's imputation step (corporate profits ~ nominal
     # GDP) — without it, 2014's corporate profits would be NaN since the
     # 2014 BoE workbook doesn't publish that variable.
+    gold_path = (
+        Path(__file__).resolve().parent.parent
+        / "old_version"
+        / "stress test benchmarks"
+        / "eco_scenarios_low_point.csv"
+    )
+    if not gold_path.exists():
+        # old_version/ is gitignored reference data that only exists on a
+        # developer's machine alongside the legacy R repo — it is absent from
+        # fresh clones and CI. Skip rather than fail so this stays a local
+        # regression guard without breaking the pipeline elsewhere.
+        pytest.skip(f"legacy R gold file not present: {gold_path}")
+
     paths = {
         2014: PROCESSED / "scenario-2014-stress.csv",
         2015: PROCESSED / "scenario-2015-stress.csv",
@@ -95,12 +108,6 @@ def test_real_data_low_point_shocks_match_legacy_r_gold():
         impute={"UK corporate profits": ["UK nominal GDP"]},
     )
 
-    gold_path = (
-        Path(__file__).resolve().parent.parent
-        / "old_version"
-        / "stress test benchmarks"
-        / "eco_scenarios_low_point.csv"
-    )
     gold = pd.read_csv(gold_path).set_index("acsyear")
 
     pd.testing.assert_frame_equal(mine[gold.columns], gold, check_dtype=False, atol=1e-10)
