@@ -12,6 +12,19 @@
           }
         ]
       }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|MultiEdit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/ruff-format.sh",
+            "timeout": 30,
+            "statusMessage": "Running ruff format + lint-fix..."
+          }
+        ]
+      }
     ]
   }
 }
