@@ -225,9 +225,7 @@ def test_predict_for_scenario_holds_firm_features_constant_per_firm(
         fitted, shock_values, firms_df[firms_df["firm_name"] == "Barclays"]
     )
     # Barclays' mortgage prediction must match between the two calls.
-    assert full.loc["Barclays", "mortgage"] == pytest.approx(
-        subset.loc["Barclays", "mortgage"]
-    )
+    assert full.loc["Barclays", "mortgage"] == pytest.approx(subset.loc["Barclays", "mortgage"])
 
 
 def test_real_fitted_models_have_sensible_coefficient_signs(

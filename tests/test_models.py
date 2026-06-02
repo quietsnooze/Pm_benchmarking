@@ -22,9 +22,7 @@ def test_add_dummies_creates_one_hot_columns_with_snake_case_suffixes():
 
 
 def test_add_dummies_preserves_original_column_and_other_columns():
-    df = pd.DataFrame(
-        {"firm_name": ["Barclays", "HSBC"], "value": [1.0, 2.0]}
-    )
+    df = pd.DataFrame({"firm_name": ["Barclays", "HSBC"], "value": [1.0, 2.0]})
     out = add_dummies(df, "firm_name")
     assert "firm_name" in out.columns
     assert list(out["firm_name"]) == ["Barclays", "HSBC"]
@@ -87,9 +85,7 @@ def test_fit_linear_model_stepwise_drops_pure_noise_predictor():
             "y": 1 + 2 * x + rng.normal(scale=0.1, size=n),
         }
     )
-    full = fit_linear_model(
-        df, dependent_var="y", independent_vars=["x", "noise"], stepwise=False
-    )
+    full = fit_linear_model(df, dependent_var="y", independent_vars=["x", "noise"], stepwise=False)
     stepped = fit_linear_model(
         df, dependent_var="y", independent_vars=["x", "noise"], stepwise=True
     )

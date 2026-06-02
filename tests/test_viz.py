@@ -37,9 +37,7 @@ def test_actual_vs_expected_figure_includes_every_input_row():
         points.extend(zip(trace.x, trace.y))
     expected_points = list(zip(df["actual"], df["prediction"]))
     for p in expected_points:
-        assert any(
-            abs(p[0] - x) < 1e-9 and abs(p[1] - y) < 1e-9 for x, y in points
-        ), p
+        assert any(abs(p[0] - x) < 1e-9 and abs(p[1] - y) < 1e-9 for x, y in points), p
 
 
 def test_actual_vs_expected_figure_axes_share_a_common_range():
