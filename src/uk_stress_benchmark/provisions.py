@@ -60,15 +60,12 @@ def load_provisions(
     missing = [c for c in _REQUIRED_COLUMNS if c not in df.columns]
     if missing:
         raise ValueError(
-            f"firm_provisions CSV missing required column(s): {missing}; "
-            f"got {list(df.columns)}"
+            f"firm_provisions CSV missing required column(s): {missing}; got {list(df.columns)}"
         )
 
     if valid_firms is not None:
         unknown = sorted(set(df["firm_name"]) - valid_firms)
         if unknown:
-            raise ValueError(
-                f"firm_provisions contains firms not in valid_firms: {unknown}"
-            )
+            raise ValueError(f"firm_provisions contains firms not in valid_firms: {unknown}")
 
     return df[list(_REQUIRED_COLUMNS)]

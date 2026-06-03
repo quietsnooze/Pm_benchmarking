@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import pandas as pd
 import plotly.graph_objects as go
-import pytest
 
 from uk_stress_benchmark.viz import actual_vs_expected_figure, predictions_heatmap
 
@@ -34,12 +33,10 @@ def test_actual_vs_expected_figure_includes_every_input_row():
     for trace in fig.data:
         if trace.x is None or trace.y is None:
             continue
-        points.extend(zip(trace.x, trace.y))
-    expected_points = list(zip(df["actual"], df["prediction"]))
+        points.extend(zip(trace.x, trace.y, strict=True))
+    expected_points = list(zip(df["actual"], df["prediction"], strict=True))
     for p in expected_points:
-        assert any(
-            abs(p[0] - x) < 1e-9 and abs(p[1] - y) < 1e-9 for x, y in points
-        ), p
+        assert any(abs(p[0] - x) < 1e-9 and abs(p[1] - y) < 1e-9 for x, y in points), p
 
 
 def test_actual_vs_expected_figure_axes_share_a_common_range():

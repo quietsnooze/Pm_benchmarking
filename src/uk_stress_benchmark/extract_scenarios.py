@@ -129,9 +129,7 @@ def clean_scenario_frame(df: pd.DataFrame) -> pd.DataFrame:
     quarter_strings = out["quarter"].astype(str)
 
     is_quarter = quarter_strings.str.match(_QUARTER_RE)
-    is_divider = quarter_strings.apply(
-        lambda s: isinstance(s, str) and bool(_DIVIDER_RE.match(s))
-    )
+    is_divider = quarter_strings.apply(lambda s: isinstance(s, str) and bool(_DIVIDER_RE.match(s)))
     divider_positions = is_divider[is_divider].index
     divider_pos = divider_positions[0] if len(divider_positions) else None
 
@@ -191,9 +189,7 @@ def extract_scenario(xlsx_path: Path, out_dir: Path) -> list[Path]:
     out_dir.mkdir(parents=True, exist_ok=True)
     written: list[Path] = []
     for sheet in config:
-        df = pd.read_excel(
-            xlsx_path, sheet_name=sheet.sheet_name, header=sheet.header_row
-        )
+        df = pd.read_excel(xlsx_path, sheet_name=sheet.sheet_name, header=sheet.header_row)
         cleaned = clean_scenario_frame(df)
         if sheet.column_renames:
             cleaned = cleaned.rename(columns=sheet.column_renames)

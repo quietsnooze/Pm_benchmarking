@@ -65,7 +65,7 @@ def test_build_modelling_dataset_inner_joins_results_shocks_provisions():
     df = build_modelling_dataset(_toy_results(), _toy_shocks(), _toy_provisions())
     # Standard Chartered excluded by default; remaining firms x acsyears
     # appear once each where data exists in all three sources.
-    assert set(zip(df["firm_name"], df["acsyear"])) == {
+    assert set(zip(df["firm_name"], df["acsyear"], strict=True)) == {
         ("Barclays", 2017),
         ("Barclays", 2018),
         ("HSBC", 2017),
@@ -225,9 +225,7 @@ def test_predict_for_scenario_holds_firm_features_constant_per_firm(
         fitted, shock_values, firms_df[firms_df["firm_name"] == "Barclays"]
     )
     # Barclays' mortgage prediction must match between the two calls.
-    assert full.loc["Barclays", "mortgage"] == pytest.approx(
-        subset.loc["Barclays", "mortgage"]
-    )
+    assert full.loc["Barclays", "mortgage"] == pytest.approx(subset.loc["Barclays", "mortgage"])
 
 
 def test_real_fitted_models_have_sensible_coefficient_signs(

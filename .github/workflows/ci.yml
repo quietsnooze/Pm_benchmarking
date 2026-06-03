@@ -1,0 +1,40 @@
+name: CI
+
+# Run the same checks Pete runs locally (ruff, pyright, pytest) on every push
+# and pull request, so a fresh clone is provably green before merge. Mirrors the
+# commands documented in CLAUDE.md's toolchain table.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Sync dependencies (incl. dev)
+        run: uv sync --extra dev
+
+      - name: Ruff format check
+        run: uv run ruff format --check .
+
+      - name: Ruff lint
+        run: uv run ruff check
+
+      # Non-blocking for now: there are ~36 pre-existing pyright errors (mostly
+      # pandas/plotly dynamic-attribute friction in basic mode). The signal is
+      # kept visible in the run, but isn't gating merges until those are cleared.
+      # Flip to a hard gate by removing continue-on-error once the count is zero.
+      - name: Pyright type check (informational)
+        continue-on-error: true
+        run: uv run pyright
+
+      - name: Pytest
+        run: uv run pytest

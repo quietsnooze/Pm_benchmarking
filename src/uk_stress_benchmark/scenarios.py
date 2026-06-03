@@ -33,9 +33,7 @@ def _snake_case(name: str) -> str:
     return s
 
 
-def compute_low_point_shocks(
-    df: pd.DataFrame, *, variables: list[str]
-) -> pd.Series:
+def compute_low_point_shocks(df: pd.DataFrame, *, variables: list[str]) -> pd.Series:
     """Compute per-variable pct_fall and pct_rise for one scenario.
 
     Parameters
@@ -129,9 +127,7 @@ def build_low_point_shocks(
         for target, predictors in impute.items():
             if target not in stacked.columns:
                 stacked[target] = pd.NA
-            stacked = impute_missing_var(
-                stacked, missing_var=target, based_on_vars=predictors
-            )
+            stacked = impute_missing_var(stacked, missing_var=target, based_on_vars=predictors)
 
     rows: dict[int, pd.Series] = {}
     for acsyear, group in stacked.groupby("acsyear"):

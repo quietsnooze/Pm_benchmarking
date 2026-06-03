@@ -60,7 +60,13 @@ _SCENARIO_KIND: dict[int, str] = {
 # modest absolute moves come out as huge percentage changes.
 _SHOCK_SLIDERS: list[tuple[str, str, float, float, float]] = [
     ("uk_residential_property_price_index_pct_fall", "UK house price fall", -0.50, 0.00, 0.01),
-    ("uk_commercial_real_estate_price_index_aggregate_pct_fall", "UK CRE price fall", -0.60, 0.00, 0.01),
+    (
+        "uk_commercial_real_estate_price_index_aggregate_pct_fall",
+        "UK CRE price fall",
+        -0.60,
+        0.00,
+        0.01,
+    ),
     ("uk_unemployment_rate_pct_rise", "UK unemployment rise", 0.00, 2.00, 0.05),
     ("uk_unemployment_rate_pct_fall", "UK unemployment fall", -0.20, 0.00, 0.01),
     ("uk_nominal_gdp_index_pct_fall", "UK nominal GDP fall", -0.15, 0.05, 0.005),
@@ -169,7 +175,7 @@ with st.expander("Low-point shock features by ACS year", expanded=False):
 st.header("Fitted models")
 
 product_tabs = st.tabs([p.title() for p in fitted_models])
-for tab, (product, model) in zip(product_tabs, fitted_models.items()):
+for tab, (product, model) in zip(product_tabs, fitted_models.items(), strict=True):
     with tab:
         recipe = RECIPES[product]
         c1, c2 = st.columns(2)

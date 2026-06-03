@@ -50,9 +50,7 @@ def add_dummies(df: pd.DataFrame, column: str) -> pd.DataFrame:
         Copy of ``df`` with one extra column per distinct value of ``column``.
     """
     dummies = pd.get_dummies(df[column], prefix=column, prefix_sep="_")
-    dummies.columns = [
-        f"{column}_{_snake_case(c[len(column) + 1 :])}" for c in dummies.columns
-    ]
+    dummies.columns = [f"{column}_{_snake_case(c[len(column) + 1 :])}" for c in dummies.columns]
     return pd.concat([df, dummies], axis=1)
 
 
