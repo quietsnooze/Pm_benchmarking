@@ -81,7 +81,7 @@ def build_modelling_dataset(
     df = df.merge(provisions, on="firm_name", how="inner")
 
     excludes_lower = {f.lower() for f in exclude_firms}
-    df = df[~df["firm_name"].str.lower().isin(excludes_lower)].reset_index(drop=True)
+    df = df.loc[~df["firm_name"].str.lower().isin(excludes_lower)].reset_index(drop=True)
 
     df = add_dummies(df, "firm_name")
     return df
@@ -197,7 +197,7 @@ def fit_product_models(
         sub = df
         if recipe.exclude_firms:
             excl = {f.lower() for f in recipe.exclude_firms}
-            sub = sub[~sub["firm_name"].str.lower().isin(excl)]
+            sub = sub.loc[~sub["firm_name"].str.lower().isin(excl)]
         fitted[name] = fit_linear_model(
             sub,
             dependent_var=recipe.dependent_var,

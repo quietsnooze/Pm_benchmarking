@@ -13,6 +13,7 @@ Public surface:
 from __future__ import annotations
 
 import re
+from collections.abc import Mapping
 from pathlib import Path
 
 import pandas as pd
@@ -78,7 +79,7 @@ def compute_low_point_shocks(df: pd.DataFrame, *, variables: list[str]) -> pd.Se
 
 
 def build_low_point_shocks(
-    paths: dict[int, Path | str],
+    paths: Mapping[int, Path | str],
     *,
     variables: list[str],
     impute: dict[str, list[str]] | None = None,
@@ -121,7 +122,7 @@ def build_low_point_shocks(
     # st_build_scenarios kept only year_zero + projection rows in the
     # dataframe it fed to st_impute_missing_var, so the LM coefficients
     # come from forecast-horizon data only. Filtering here matches that.
-    stacked = stacked[stacked["period_kind"].isin(["year_zero", "projection"])]
+    stacked = stacked.loc[stacked["period_kind"].isin(["year_zero", "projection"])]
 
     if impute:
         for target, predictors in impute.items():
@@ -131,7 +132,8 @@ def build_low_point_shocks(
 
     rows: dict[int, pd.Series] = {}
     for acsyear, group in stacked.groupby("acsyear"):
-        rows[int(acsyear)] = compute_low_point_shocks(group, variables=variables)
+        # groupby keys are typed Hashable; acsyear is the int we tagged above.
+        rows[int(acsyear)] = compute_low_point_shocks(group, variables=variables)  # type: ignore[arg-type]
     out = pd.DataFrame(rows).T.sort_index()
     out.index.name = "acsyear"
     return out

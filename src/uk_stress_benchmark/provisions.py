@@ -68,4 +68,4 @@ def load_provisions(
         if unknown:
             raise ValueError(f"firm_provisions contains firms not in valid_firms: {unknown}")
 
-    return df[list(_REQUIRED_COLUMNS)]
+    return df.loc[:, list(_REQUIRED_COLUMNS)]

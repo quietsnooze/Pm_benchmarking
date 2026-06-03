@@ -21,8 +21,10 @@ Update the table when a new scenario year is added.
 from __future__ import annotations
 
 import re
+from collections.abc import Hashable
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import cast
 
 import pandas as pd
 
@@ -124,21 +126,21 @@ def clean_scenario_frame(df: pd.DataFrame) -> pd.DataFrame:
       ``period_kind`` is ``pd.NA`` for every row.
     """
     out = df.copy()
-    first_col = out.columns[0]
+    first_col = cast(Hashable, out.columns[0])
     out = out.rename(columns={first_col: "quarter"})
     quarter_strings = out["quarter"].astype(str)
 
     is_quarter = quarter_strings.str.match(_QUARTER_RE)
     is_divider = quarter_strings.apply(lambda s: isinstance(s, str) and bool(_DIVIDER_RE.match(s)))
-    divider_positions = is_divider[is_divider].index
-    divider_pos = divider_positions[0] if len(divider_positions) else None
+    divider_positions = is_divider.loc[is_divider].index
+    divider_pos = int(divider_positions[0]) if len(divider_positions) else None
 
-    out = out[is_quarter].copy()
+    out = out.loc[is_quarter].copy()
     out = out.dropna(axis=1, how="all")
 
     if divider_pos is not None:
         # Use original (pre-filter) row indices to compare against divider position.
-        kinds = ["history" if i < divider_pos else "projection" for i in out.index]
+        kinds = ["history" if int(i) < divider_pos else "projection" for i in out.index]
         # The last "history" row is T0 / year_zero.
         last_history = next(
             (i for i in range(len(kinds) - 1, -1, -1) if kinds[i] == "history"),
