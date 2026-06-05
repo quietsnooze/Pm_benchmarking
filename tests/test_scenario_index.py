@@ -6,6 +6,7 @@ fed to the regression. Decouples downstream code from per-year filename rules.
 from __future__ import annotations
 
 import pytest
+
 from uk_stress_benchmark.scenario_index import (
     ScenarioRecord,
     modelling_paths,

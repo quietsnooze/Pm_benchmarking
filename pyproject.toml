@@ -43,6 +43,12 @@ target-version = "py312"
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM"]
 
+[tool.ruff.lint.isort]
+# Pin first-party detection so import grouping is identical locally and in CI.
+# Without this, ruff's auto-detection of the src-layout package can differ by
+# environment, producing I001 only in one place.
+known-first-party = ["uk_stress_benchmark"]
+
 [tool.ruff.lint.per-file-ignores]
 # Test fixtures often hold verbatim source-data lines that legitimately exceed
 # the line-length budget; relaxing E501 there keeps the fixture faithful.
