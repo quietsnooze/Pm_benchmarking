@@ -28,6 +28,9 @@ from typing import cast
 
 import pandas as pd
 
+from uk_stress_benchmark import scenario_index
+from uk_stress_benchmark.scenario_index import ScenarioRecord
+
 # 2014's BoE workbook uses a different column-naming convention from the
 # 2015-2019 workbooks (no "UK " prefix on UK-specific variables, and a
 # different name for the residential property price index). Rename the
@@ -46,47 +49,66 @@ class _SheetConfig:
     sheet_name: str
     header_row: int  # 0-indexed
     out_name: str
+    acsyear: int
+    role: str  # "stress" / "base" / "acs" / "bes" / "non-participants"
+    model_input: bool = False  # the one canonical stressed scenario per year
     column_renames: dict[str, str] | None = None
 
 
 # Per-workbook config. Sheets that aren't macroeconomic-variables tables
 # (Disclaimer, Sources and definitions, Yield curves, FAME Persistence,
-# Index) are deliberately omitted.
+# Index) are deliberately omitted. ``model_input`` marks the single scenario
+# per year fed to the regression (2014-2016 publish only "stress"; 2017+ use
+# "acs"); base / BES / non-participant scenarios are recorded but not modelled.
 _CONFIGS: dict[str, list[_SheetConfig]] = {
     "stress-testing-the-uk-banking-system-variable-paths-for-the-2014-scenario.xlsx": [
-        _SheetConfig("Data", 0, "scenario-2014-stress.csv", _RENAMES_2014),
+        _SheetConfig("Data", 0, "scenario-2014-stress.csv", 2014, "stress", True, _RENAMES_2014),
     ],
     "stress-testing-the-uk-banking-system-variable-paths-for-the-2015-scenario.xlsx": [
-        _SheetConfig("Macroeconomic variables (b) ", 1, "scenario-2015-base.csv"),
-        _SheetConfig("Macroeconomic variables (s)", 1, "scenario-2015-stress.csv"),
+        _SheetConfig("Macroeconomic variables (b) ", 1, "scenario-2015-base.csv", 2015, "base"),
+        _SheetConfig(
+            "Macroeconomic variables (s)", 1, "scenario-2015-stress.csv", 2015, "stress", True
+        ),
     ],
     "variable-paths-for-the-2016-stress-test.xlsx": [
-        _SheetConfig("Macroeconomic variables (b) ", 1, "scenario-2016-base.csv"),
-        _SheetConfig("Macroeconomic variables (s)", 1, "scenario-2016-stress.csv"),
+        _SheetConfig("Macroeconomic variables (b) ", 1, "scenario-2016-base.csv", 2016, "base"),
+        _SheetConfig(
+            "Macroeconomic variables (s)", 1, "scenario-2016-stress.csv", 2016, "stress", True
+        ),
     ],
     "stress-testing-the-uk-banking-system-variable-paths-for-the-2017-scenario.xlsx": [
-        _SheetConfig("Macroeconomic variables (Base) ", 1, "scenario-2017-base.csv"),
-        _SheetConfig("Macroeconomic variables (ACS)", 1, "scenario-2017-acs.csv"),
-        _SheetConfig("Macroeconomic variables (BES)", 1, "scenario-2017-bes.csv"),
+        _SheetConfig("Macroeconomic variables (Base) ", 1, "scenario-2017-base.csv", 2017, "base"),
+        _SheetConfig(
+            "Macroeconomic variables (ACS)", 1, "scenario-2017-acs.csv", 2017, "acs", True
+        ),
+        _SheetConfig("Macroeconomic variables (BES)", 1, "scenario-2017-bes.csv", 2017, "bes"),
     ],
     "stress-testing-the-uk-banking-system-variable-paths-for-the-2018-scenario.xlsx": [
-        _SheetConfig("Macroeconomic variables (Base)", 1, "scenario-2018-base.csv"),
-        _SheetConfig("Macroeconomic variables (ACS)", 1, "scenario-2018-acs.csv"),
+        _SheetConfig("Macroeconomic variables (Base)", 1, "scenario-2018-base.csv", 2018, "base"),
+        _SheetConfig(
+            "Macroeconomic variables (ACS)", 1, "scenario-2018-acs.csv", 2018, "acs", True
+        ),
     ],
     "stress-testing-the-uk-banking-system-variable-paths-for-the-2019-scenario.xlsx": [
-        _SheetConfig("Macroeconomic variables (Base) ", 1, "scenario-2019-base.csv"),
-        _SheetConfig("Macroeconomic variables (ACS)", 1, "scenario-2019-acs.csv"),
+        _SheetConfig("Macroeconomic variables (Base) ", 1, "scenario-2019-base.csv", 2019, "base"),
+        _SheetConfig(
+            "Macroeconomic variables (ACS)", 1, "scenario-2019-acs.csv", 2019, "acs", True
+        ),
     ],
     "variable-paths-for-firms-not-participating-in-2019-concurrent-stress-test.XLSX": [
         _SheetConfig(
             "Stress scenario - Rates Down ",
             1,
             "scenario-2019-non-participants-rates-down.csv",
+            2019,
+            "non-participants",
         ),
         _SheetConfig(
             "Stress scenario - Rates Up ",
             1,
             "scenario-2019-non-participants-rates-up.csv",
+            2019,
+            "non-participants",
         ),
     ],
 }
@@ -180,6 +202,26 @@ def add_uk_nominal_gdp_index(df: pd.DataFrame) -> pd.DataFrame:
     return out
 
 
+def scenario_records() -> list[ScenarioRecord]:
+    """Flatten ``_CONFIGS`` into manifest records (one per scenario CSV)."""
+    return [
+        ScenarioRecord(s.acsyear, s.role, s.out_name, s.model_input)
+        for sheets in _CONFIGS.values()
+        for s in sheets
+    ]
+
+
+def write_scenario_manifest(out_dir: Path) -> Path:
+    """Write the scenario manifest declaring the canonical modelled scenario per year.
+
+    Only scenarios whose CSV is actually present in ``out_dir`` are recorded, so
+    the manifest never points downstream at a file a skipped/missing workbook
+    didn't produce.
+    """
+    present = [r for r in scenario_records() if (out_dir / r.path).exists()]
+    return scenario_index.write(present, out_dir)
+
+
 def extract_scenario(xlsx_path: Path, out_dir: Path) -> list[Path]:
     """Extract every configured scenario sheet from ``xlsx_path`` to CSV.
 
@@ -221,6 +263,8 @@ def main() -> None:
             continue
         report.csv_paths.extend(paths)
         print(f"{name}: {len(paths)} CSV(s) -> {[p.name for p in paths]}")
+    manifest_path = write_scenario_manifest(out_dir)
+    print(f"Wrote scenario manifest -> {manifest_path.name}")
     print(f"\nTotal: {len(report.csv_paths)} CSV(s) -> {out_dir.relative_to(repo_root)}")
     if report.skipped:
         print(f"Skipped {len(report.skipped)}; missing workbooks: ", end="")

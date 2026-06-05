@@ -27,6 +27,7 @@ from uk_stress_benchmark.pipeline import (
 )
 from uk_stress_benchmark.provisions import load_provisions
 from uk_stress_benchmark.results import load_results
+from uk_stress_benchmark.scenario_index import modelling_paths
 from uk_stress_benchmark.scenarios import build_low_point_shocks
 from uk_stress_benchmark.viz import actual_vs_expected_figure, predictions_heatmap
 
@@ -43,17 +44,6 @@ _CANONICAL_VARS: list[str] = [
     "UK corporate profits",
     "UK Bank Rate",
 ]
-
-# Stress-scenario CSV file conventions: 2014-2016 published a single
-# "stress" scenario; 2017-2019 use "acs" (annual cyclical scenario).
-_SCENARIO_KIND: dict[int, str] = {
-    2014: "stress",
-    2015: "stress",
-    2016: "stress",
-    2017: "acs",
-    2018: "acs",
-    2019: "acs",
-}
 
 # What-if slider definitions. Each: (column-name, label, min, max, step).
 # Bank-rate ranges are wide because the rate itself is small — even
@@ -89,9 +79,8 @@ def _load_firm_data() -> tuple[pd.DataFrame, pd.DataFrame]:
 
 @st.cache_data(show_spinner="Computing low-point shocks…")
 def _load_shocks() -> pd.DataFrame:
-    paths = {y: PROCESSED / f"scenario-{y}-{kind}.csv" for y, kind in _SCENARIO_KIND.items()}
     return build_low_point_shocks(
-        paths,
+        modelling_paths(PROCESSED),
         variables=_CANONICAL_VARS,
         impute={"UK corporate profits": ["UK nominal GDP"]},
     )
@@ -216,7 +205,7 @@ st.write(
 
 default_year = st.selectbox(
     "Start from ACS year",
-    options=sorted(_SCENARIO_KIND.keys()),
+    options=sorted(modelling_paths(PROCESSED)),
     index=3,  # 2017 default
 )
 defaults_row = shocks_df.loc[default_year]
