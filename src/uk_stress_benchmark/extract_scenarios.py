@@ -117,6 +117,14 @@ _CONFIGS: dict[str, list[_SheetConfig]] = {
             "non-participants",
         ),
     ],
+    # 2022/23 ACS. Header is on the first row (unlike 2015-2019's row 2), and
+    # the CRE column already carries the "- aggregate" suffix, so no renames.
+    "stress-testing-the-uk-banking-system-variable-paths-for-the-2022-scenarios.xlsx": [
+        _SheetConfig("Macroeconomic variables (Base) ", 0, "scenario-2022-base.csv", 2022, "base"),
+        _SheetConfig(
+            "Macroeconomic variables(Stress)", 0, "scenario-2022-stress.csv", 2022, "stress", True
+        ),
+    ],
     # 2025 Bank Capital Stress Test: a single severe scenario (no separate base
     # sheet), so it is the modelled input for the year.
     "variable-paths-for-the-2025-bank-capital-stress-test.xlsx": [

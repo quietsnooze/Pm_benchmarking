@@ -79,6 +79,15 @@ _TABLE_MAPPINGS: dict[tuple[str, str], dict[str, str]] = {
         "col_3": "uk_cre_5yr_ic_pct",
         "col_4": "uk_bus_5yr_ic_pct",
     },
+    # 2022/23 ACS: bank-specific impairment-charge rates are "Annex 2, Table
+    # A2.A", same four-product shape. Group-level firms only (ring-fenced
+    # subsidiaries and Virgin Money UK are dropped to match the legacy set).
+    ("2022", "A2A"): {
+        "col_1": "uk_mort_5yr_ic_pct",
+        "col_2": "uk_retail_5yr_ic_pct",
+        "col_3": "uk_cre_5yr_ic_pct",
+        "col_4": "uk_bus_5yr_ic_pct",
+    },
     # 2025 Bank Capital Stress Test: bank-specific impairment-charge rates moved
     # to "Annex 3, Table A3.1" but keep the same four-product shape. Columns are
     # mortgage / non-mortgage retail / CRE / business (excluding CRE).
