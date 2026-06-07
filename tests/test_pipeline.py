@@ -14,7 +14,6 @@ from uk_stress_benchmark.pipeline import (
     fit_product_models,
     predict_for_scenario,
 )
-from uk_stress_benchmark.provisions import load_provisions
 from uk_stress_benchmark.results import load_results
 from uk_stress_benchmark.scenario_index import modelling_paths
 from uk_stress_benchmark.scenarios import build_low_point_shocks
@@ -51,21 +50,10 @@ def _toy_shocks() -> pd.DataFrame:
     ).set_index("acsyear")
 
 
-def _toy_provisions() -> pd.DataFrame:
-    return pd.DataFrame(
-        {
-            "firm_name": ["Barclays", "HSBC", "Standard Chartered", "Nationwide"],
-            "mort_prov_coverage": [0.0028, 0.001, None, 0.0011],
-            "retail_prov_coverage": [0.081, 0.037, None, 0.0911],
-            "commercial_prov_coverage": [0.008, 0.0123, 0.013517, 0.005],
-        }
-    )
-
-
-def test_build_modelling_dataset_inner_joins_results_shocks_provisions():
-    df = build_modelling_dataset(_toy_results(), _toy_shocks(), _toy_provisions())
+def test_build_modelling_dataset_inner_joins_results_and_shocks():
+    df = build_modelling_dataset(_toy_results(), _toy_shocks())
     # Standard Chartered excluded by default; remaining firms x acsyears
-    # appear once each where data exists in all three sources.
+    # appear once each where data exists in both sources.
     assert set(zip(df["firm_name"], df["acsyear"], strict=True)) == {
         ("Barclays", 2017),
         ("Barclays", 2018),
@@ -75,7 +63,7 @@ def test_build_modelling_dataset_inner_joins_results_shocks_provisions():
 
 
 def test_build_modelling_dataset_default_exclude_matches_legacy_r():
-    df = build_modelling_dataset(_toy_results(), _toy_shocks(), _toy_provisions())
+    df = build_modelling_dataset(_toy_results(), _toy_shocks())
     assert "Standard Chartered" not in set(df["firm_name"])
 
 
@@ -84,7 +72,6 @@ def test_build_modelling_dataset_excludes_are_case_insensitive():
     df = build_modelling_dataset(
         _toy_results(),
         _toy_shocks(),
-        _toy_provisions(),
         exclude_firms=("standard chartered", "BARCLAYS"),
     )
     firms = set(df["firm_name"])
@@ -94,7 +81,7 @@ def test_build_modelling_dataset_excludes_are_case_insensitive():
 
 
 def test_build_modelling_dataset_adds_firm_name_dummies():
-    df = build_modelling_dataset(_toy_results(), _toy_shocks(), _toy_provisions())
+    df = build_modelling_dataset(_toy_results(), _toy_shocks())
     # Original firm_name column preserved; one-hot columns added with
     # snake_case suffixes matching add_dummies.
     assert "firm_name" in df.columns
@@ -145,16 +132,14 @@ def real_modelling_df() -> pd.DataFrame:
         impute={"UK corporate profits": ["UK nominal GDP"]},
     )
     results = load_results(PROCESSED / "firm_results.csv")
-    provisions = load_provisions(PROCESSED / "firm_provisions.csv")
-    return build_modelling_dataset(results, shocks, provisions)
+    return build_modelling_dataset(results, shocks)
 
 
 def test_real_modelling_dataset_has_expected_firms_and_acsyears(
     real_modelling_df: pd.DataFrame,
 ):
     firms = set(real_modelling_df["firm_name"])
-    # SCB excluded by default. Co-op present in firm_results but not in
-    # firm_provisions, so the inner join drops it.
+    # SCB and The Co-operative Bank are both excluded by default.
     assert "Standard Chartered" not in firms
     assert "The Co-operative Bank" not in firms
     assert {"Barclays", "HSBC", "Lloyds Banking Group", "Nationwide", "Santander UK"}.issubset(

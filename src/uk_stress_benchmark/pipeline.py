@@ -1,11 +1,10 @@
 """Modelling-dataset assembly + per-product OLS orchestration.
 
 This is where the pieces come together: ``firm_results`` (one row per firm
-x acsyear) is inner-joined to the per-acsyear low-point shocks and the
-per-firm provision-coverage frame, firm-name dummies are added, and a
-universal exclude list (Standard Chartered by default — non-UK retail
-book) is applied. The result is the regression dataset the legacy R
-called ``st_modelling_df``.
+x acsyear) is inner-joined to the per-acsyear low-point shocks, firm-name
+dummies are added, and a universal exclude list (Standard Chartered and
+The Co-operative Bank by default) is applied. The result is the regression
+dataset the legacy R called ``st_modelling_df``.
 
 On top of that, the four product recipes (mortgage / retail / CRE /
 business) are encoded as :class:`ProductRecipe` constants in
@@ -14,7 +13,7 @@ Each recipe carries its own per-product additional excludes (CRE drops
 Nationwide, mirroring the legacy v4.R).
 
 Public surface:
-    build_modelling_dataset(results, shocks, provisions, *, exclude_firms)
+    build_modelling_dataset(results, shocks, *, exclude_firms)
         -> pd.DataFrame
     ProductRecipe                         (frozen dataclass)
     RECIPES: dict[str, ProductRecipe]     ({"mortgage", "retail", "cre", "business"})
@@ -31,17 +30,18 @@ from statsmodels.regression.linear_model import RegressionResults
 
 from uk_stress_benchmark.models import add_dummies, fit_linear_model, predict_with_model
 
-# Universal default exclude — Standard Chartered is on the BoE list of UK
-# stress-test participants but its UK retail / mortgage book is too small
-# to model meaningfully. Mirrors the legacy v4.R `filter(!firm_name == "SCB")`
-# applied before fitting any product model.
-_DEFAULT_EXCLUDE: tuple[str, ...] = ("Standard Chartered",)
+# Universal default exclude. Standard Chartered is on the BoE list of UK
+# stress-test participants but its UK retail / mortgage book is too small to
+# model meaningfully (mirrors the legacy v4.R `filter(!firm_name == "SCB")`).
+# The Co-operative Bank appears only in 2014 and was historically dropped as a
+# side effect of the (now-removed) provisions inner-join; it is excluded
+# explicitly so the modelling firm set is unchanged.
+_DEFAULT_EXCLUDE: tuple[str, ...] = ("Standard Chartered", "The Co-operative Bank")
 
 
 def build_modelling_dataset(
     results: pd.DataFrame,
     shocks: pd.DataFrame,
-    provisions: pd.DataFrame,
     *,
     exclude_firms: tuple[str, ...] = _DEFAULT_EXCLUDE,
 ) -> pd.DataFrame:
@@ -57,14 +57,10 @@ def build_modelling_dataset(
         Output of :func:`uk_stress_benchmark.scenarios.build_low_point_shocks`.
         Indexed by ``acsyear`` (or carrying it as a column) with the
         per-variable ``_pct_fall`` / ``_pct_rise`` features.
-    provisions : pd.DataFrame
-        Output of :func:`uk_stress_benchmark.provisions.load_provisions`.
-        One row per firm, with the three ``*_prov_coverage`` columns.
     exclude_firms : tuple[str, ...]
         Firms to drop from the dataset before modelling. Match is
-        case-insensitive on ``firm_name``. Default is
-        ``("Standard Chartered",)`` — the universal exclude that all
-        four legacy R product models applied.
+        case-insensitive on ``firm_name``. Default is Standard Chartered
+        (the universal legacy exclude) plus The Co-operative Bank.
 
     Returns
     -------
@@ -78,7 +74,6 @@ def build_modelling_dataset(
         shocks = shocks.reset_index()
 
     df = results.merge(shocks, on="acsyear", how="inner")
-    df = df.merge(provisions, on="firm_name", how="inner")
 
     excludes_lower = {f.lower() for f in exclude_firms}
     df = df.loc[~df["firm_name"].str.lower().isin(excludes_lower)].reset_index(drop=True)
@@ -96,8 +91,8 @@ class ProductRecipe:
     dependent_var : str
         Name of the impairment-charge column to model.
     independent_vars : tuple[str, ...]
-        Predictor column names (a mix of low-point-shock features, provision-
-        coverage columns, and firm-name dummies).
+        Predictor column names (a mix of low-point-shock features and
+        firm-name dummies).
     exclude_firms : tuple[str, ...]
         Additional firms to drop *before fitting this specific product*,
         on top of the dataset-wide exclude. Case-insensitive match on
@@ -125,7 +120,6 @@ RECIPES: dict[str, ProductRecipe] = {
             "uk_residential_property_price_index_pct_fall",
             "uk_unemployment_rate_pct_rise",
             "uk_unemployment_rate_pct_fall",
-            "mort_prov_coverage",
             "firm_name_santander_uk",
             "uk_bank_rate_pct_rise",
             "uk_bank_rate_pct_fall",
@@ -137,7 +131,6 @@ RECIPES: dict[str, ProductRecipe] = {
             "uk_unemployment_rate_pct_rise",
             "uk_bank_rate_pct_rise",
             "uk_bank_rate_pct_fall",
-            "retail_prov_coverage",
         ),
     ),
     "cre": ProductRecipe(
@@ -145,7 +138,6 @@ RECIPES: dict[str, ProductRecipe] = {
         independent_vars=(
             "uk_commercial_real_estate_price_index_aggregate_pct_fall",
             "uk_corporate_profits_pct_fall",
-            "commercial_prov_coverage",
             "uk_unemployment_rate_pct_rise",
             "uk_unemployment_rate_pct_fall",
             "firm_name_santander_uk",
@@ -159,7 +151,6 @@ RECIPES: dict[str, ProductRecipe] = {
         independent_vars=(
             "uk_nominal_gdp_index_pct_fall",
             "uk_corporate_profits_pct_fall",
-            "commercial_prov_coverage",
             "uk_unemployment_rate_pct_rise",
             "uk_unemployment_rate_pct_fall",
             "firm_name_santander_uk",

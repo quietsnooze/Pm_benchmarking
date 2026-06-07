@@ -25,7 +25,6 @@ from uk_stress_benchmark.pipeline import (
     fit_product_models,
     predict_for_scenario,
 )
-from uk_stress_benchmark.provisions import load_provisions
 from uk_stress_benchmark.results import load_results
 from uk_stress_benchmark.scenario_index import modelling_paths
 from uk_stress_benchmark.scenarios import build_low_point_shocks
@@ -69,12 +68,9 @@ _SHOCK_SLIDERS: list[tuple[str, str, float, float, float]] = [
 # ----------------------------- data plumbing -------------------------------
 
 
-@st.cache_data(show_spinner="Loading firm results / provisions…")
-def _load_firm_data() -> tuple[pd.DataFrame, pd.DataFrame]:
-    return (
-        load_results(PROCESSED / "firm_results.csv"),
-        load_provisions(PROCESSED / "firm_provisions.csv"),
-    )
+@st.cache_data(show_spinner="Loading firm results…")
+def _load_results() -> pd.DataFrame:
+    return load_results(PROCESSED / "firm_results.csv")
 
 
 @st.cache_data(show_spinner="Computing low-point shocks…")
@@ -88,9 +84,9 @@ def _load_shocks() -> pd.DataFrame:
 
 @st.cache_resource(show_spinner="Fitting product models…")
 def _fit_everything() -> tuple[pd.DataFrame, dict]:
-    results, provisions = _load_firm_data()
+    results = _load_results()
     shocks = _load_shocks()
-    modelling_df = build_modelling_dataset(results, shocks, provisions)
+    modelling_df = build_modelling_dataset(results, shocks)
     fitted = fit_product_models(modelling_df)
     return modelling_df, fitted
 
@@ -118,11 +114,11 @@ st.caption(f"v{__version__}  ·  Bank of England ACS 2014–2019")
 st.markdown(
     """
 This app benchmarks UK banking-system impairment-charge outcomes against the
-Bank of England's annual cyclical scenario (ACS) stress tests from 2014 to 2019.
-For each lending product (mortgages, retail unsecured, commercial real estate,
-business lending) it fits an OLS regression of the firm-level 5-year impairment-
-charge percentage on the worst-point shocks observed in each scenario's
-projection horizon, plus firm-specific provision-coverage levels.
+Bank of England's stress tests (the 2014-2019 annual cyclical scenarios plus the
+2022/23 ACS and 2025 Bank Capital Stress Test). For each lending product
+(mortgages, retail unsecured, commercial real estate, business lending) it fits
+an OLS regression of the firm-level 5-year impairment-charge percentage on the
+worst-point shocks observed in each scenario's projection horizon.
 
 The fitted models are then used to predict per-firm impairment under a
 hypothetical scenario you set via the sliders in the **What-if explorer** below.
