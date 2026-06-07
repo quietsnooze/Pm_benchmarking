@@ -13,3 +13,4 @@ acsyear,role,model_input,path
 2019,base,False,scenario-2019-base.csv
 2019,non-participants,False,scenario-2019-non-participants-rates-down.csv
 2019,non-participants,False,scenario-2019-non-participants-rates-up.csv
+2025,stress,True,scenario-2025-stress.csv

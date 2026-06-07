@@ -15,8 +15,16 @@ import pytest
 
 from uk_stress_benchmark.provisions import load_provisions
 from uk_stress_benchmark.results import load_results
+from uk_stress_benchmark.scenario_index import modelling_paths
 
 PROCESSED = Path(__file__).resolve().parent.parent / "processed_inputs"
+
+
+def test_manifest_resolves_the_2025_scenario_to_an_existing_csv():
+    paths = modelling_paths(PROCESSED)
+    assert 2025 in paths, "2025 BCST should be a modelled scenario in the manifest"
+    assert paths[2025].name == "scenario-2025-stress.csv"
+    assert paths[2025].exists()
 
 
 @pytest.fixture(scope="module")
@@ -29,9 +37,12 @@ def real_provisions() -> pd.DataFrame:
     return load_provisions(PROCESSED / "firm_provisions.csv")
 
 
-def test_real_firm_results_loads_and_covers_2014_to_2019(real_results: pd.DataFrame):
-    years = sorted(real_results["acsyear"].unique())
-    assert years == [2014, 2015, 2016, 2017, 2018, 2019]
+def test_real_firm_results_covers_the_legacy_and_newer_years(real_results: pd.DataFrame):
+    years = set(real_results["acsyear"].unique())
+    # The original 2014-2019 ACS series must always be present...
+    assert {2014, 2015, 2016, 2017, 2018, 2019}.issubset(years)
+    # ...and the newer Bank Capital Stress Test year is now included too.
+    assert 2025 in years
 
 
 def test_real_firm_results_imputes_2014_5yr_from_3yr(real_results: pd.DataFrame):

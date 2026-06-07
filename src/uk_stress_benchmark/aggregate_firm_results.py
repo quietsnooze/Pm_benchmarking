@@ -79,6 +79,15 @@ _TABLE_MAPPINGS: dict[tuple[str, str], dict[str, str]] = {
         "col_3": "uk_cre_5yr_ic_pct",
         "col_4": "uk_bus_5yr_ic_pct",
     },
+    # 2025 Bank Capital Stress Test: bank-specific impairment-charge rates moved
+    # to "Annex 3, Table A3.1" but keep the same four-product shape. Columns are
+    # mortgage / non-mortgage retail / CRE / business (excluding CRE).
+    ("2025", "A31"): {
+        "col_1": "uk_mort_5yr_ic_pct",
+        "col_2": "uk_retail_5yr_ic_pct",
+        "col_3": "uk_cre_5yr_ic_pct",
+        "col_4": "uk_bus_5yr_ic_pct",
+    },
 }
 
 # Firm-name canonicalisation. BoE drops "Group" off "The Royal Bank of
@@ -86,6 +95,10 @@ _TABLE_MAPPINGS: dict[tuple[str, str], dict[str, str]] = {
 # so downstream code sees a single firm identity.
 _FIRM_CANONICAL: dict[str, str] = {
     "The Royal Bank of Scotland": "The Royal Bank of Scotland Group",
+    # RBS rebranded to NatWest Group in 2020; collapse to the legacy identity so
+    # the firm has one continuous identity across the 2014-2019 and 2021+ eras
+    # (provisions and firm dummies key on the legacy name).
+    "NatWest Group": "The Royal Bank of Scotland Group",
 }
 
 # Output column order — matches the legacy R `results.csv` shape.

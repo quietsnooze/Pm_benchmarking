@@ -43,6 +43,12 @@ _RENAMES_2014: dict[str, str] = {
     "Commercial real estate price index ": "UK commercial real estate price index - aggregate",
 }
 
+# The 2025 Bank Capital Stress Test workbook drops the "- aggregate" suffix on
+# the CRE index; rename so it shares the analysis vocabulary with 2014-2019.
+_RENAMES_2025: dict[str, str] = {
+    "UK commercial real estate price index": "UK commercial real estate price index - aggregate",
+}
+
 
 @dataclass(frozen=True)
 class _SheetConfig:
@@ -109,6 +115,19 @@ _CONFIGS: dict[str, list[_SheetConfig]] = {
             "scenario-2019-non-participants-rates-up.csv",
             2019,
             "non-participants",
+        ),
+    ],
+    # 2025 Bank Capital Stress Test: a single severe scenario (no separate base
+    # sheet), so it is the modelled input for the year.
+    "variable-paths-for-the-2025-bank-capital-stress-test.xlsx": [
+        _SheetConfig(
+            "Macroeconomic variables",
+            1,
+            "scenario-2025-stress.csv",
+            2025,
+            "stress",
+            True,
+            _RENAMES_2025,
         ),
     ],
 }
