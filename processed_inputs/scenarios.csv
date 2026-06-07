@@ -1,0 +1,15 @@
+acsyear,role,model_input,path
+2014,stress,True,scenario-2014-stress.csv
+2015,base,False,scenario-2015-base.csv
+2015,stress,True,scenario-2015-stress.csv
+2016,base,False,scenario-2016-base.csv
+2016,stress,True,scenario-2016-stress.csv
+2017,acs,True,scenario-2017-acs.csv
+2017,base,False,scenario-2017-base.csv
+2017,bes,False,scenario-2017-bes.csv
+2018,acs,True,scenario-2018-acs.csv
+2018,base,False,scenario-2018-base.csv
+2019,acs,True,scenario-2019-acs.csv
+2019,base,False,scenario-2019-base.csv
+2019,non-participants,False,scenario-2019-non-participants-rates-down.csv
+2019,non-participants,False,scenario-2019-non-participants-rates-up.csv

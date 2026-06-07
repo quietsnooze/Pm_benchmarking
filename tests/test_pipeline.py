@@ -16,6 +16,7 @@ from uk_stress_benchmark.pipeline import (
 )
 from uk_stress_benchmark.provisions import load_provisions
 from uk_stress_benchmark.results import load_results
+from uk_stress_benchmark.scenario_index import modelling_paths
 from uk_stress_benchmark.scenarios import build_low_point_shocks
 
 PROCESSED = Path(__file__).resolve().parent.parent / "processed_inputs"
@@ -125,14 +126,10 @@ def test_cre_recipe_excludes_nationwide_per_legacy_r():
 
 @pytest.fixture(scope="module")
 def real_modelling_df() -> pd.DataFrame:
-    paths = {
-        2014: PROCESSED / "scenario-2014-stress.csv",
-        2015: PROCESSED / "scenario-2015-stress.csv",
-        2016: PROCESSED / "scenario-2016-stress.csv",
-        2017: PROCESSED / "scenario-2017-acs.csv",
-        2018: PROCESSED / "scenario-2018-acs.csv",
-        2019: PROCESSED / "scenario-2019-acs.csv",
-    }
+    # Sourced from the scenario manifest, not a hard-coded year->file map, so
+    # this smoke test automatically covers any new stress-test year that ingest
+    # registers.
+    paths = modelling_paths(PROCESSED)
     canonical_vars = [
         "UK residential property price index",
         "UK commercial real estate price index - aggregate",
