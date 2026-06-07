@@ -79,6 +79,11 @@ _TABLE_MAPPINGS: dict[tuple[str, str], dict[str, str]] = {
         "col_3": "uk_cre_5yr_ic_pct",
         "col_4": "uk_bus_5yr_ic_pct",
     },
+    # NB: 2021 Solvency Stress Test results are deliberately NOT mapped here.
+    # The 2021 SST is a COVID-recovery scenario whose milder path destabilises
+    # the pooled regression (it flips a weak unemployment coefficient), so it is
+    # kept for scenario/what-if coverage only, not as a training year. Its
+    # scenario is still registered in extract_scenarios / the manifest.
     # 2022/23 ACS: bank-specific impairment-charge rates are "Annex 2, Table
     # A2.A", same four-product shape. Group-level firms only (ring-fenced
     # subsidiaries and Virgin Money UK are dropped to match the legacy set).

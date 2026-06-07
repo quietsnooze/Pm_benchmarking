@@ -117,6 +117,13 @@ _CONFIGS: dict[str, list[_SheetConfig]] = {
             "non-participants",
         ),
     ],
+    # 2021 Solvency Stress Test: a single severe macro scenario (one sheet), so
+    # it is the modelled input. Header on row 2 and CRE already suffixed.
+    "stress-testing-the-uk-banking-system-variable-paths-for-the-2021-scenario.xlsx": [
+        _SheetConfig(
+            "Macroeconomic variables", 1, "scenario-2021-stress.csv", 2021, "stress", True
+        ),
+    ],
     # 2022/23 ACS. Header is on the first row (unlike 2015-2019's row 2), and
     # the CRE column already carries the "- aggregate" suffix, so no renames.
     "stress-testing-the-uk-banking-system-variable-paths-for-the-2022-scenarios.xlsx": [
