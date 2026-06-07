@@ -43,6 +43,12 @@ _RENAMES_2014: dict[str, str] = {
     "Commercial real estate price index ": "UK commercial real estate price index - aggregate",
 }
 
+# The 2025 Bank Capital Stress Test workbook drops the "- aggregate" suffix on
+# the CRE index; rename so it shares the analysis vocabulary with 2014-2019.
+_RENAMES_2025: dict[str, str] = {
+    "UK commercial real estate price index": "UK commercial real estate price index - aggregate",
+}
+
 
 @dataclass(frozen=True)
 class _SheetConfig:
@@ -109,6 +115,34 @@ _CONFIGS: dict[str, list[_SheetConfig]] = {
             "scenario-2019-non-participants-rates-up.csv",
             2019,
             "non-participants",
+        ),
+    ],
+    # 2021 Solvency Stress Test: a single severe macro scenario (one sheet), so
+    # it is the modelled input. Header on row 2 and CRE already suffixed.
+    "stress-testing-the-uk-banking-system-variable-paths-for-the-2021-scenario.xlsx": [
+        _SheetConfig(
+            "Macroeconomic variables", 1, "scenario-2021-stress.csv", 2021, "stress", True
+        ),
+    ],
+    # 2022/23 ACS. Header is on the first row (unlike 2015-2019's row 2), and
+    # the CRE column already carries the "- aggregate" suffix, so no renames.
+    "stress-testing-the-uk-banking-system-variable-paths-for-the-2022-scenarios.xlsx": [
+        _SheetConfig("Macroeconomic variables (Base) ", 0, "scenario-2022-base.csv", 2022, "base"),
+        _SheetConfig(
+            "Macroeconomic variables(Stress)", 0, "scenario-2022-stress.csv", 2022, "stress", True
+        ),
+    ],
+    # 2025 Bank Capital Stress Test: a single severe scenario (no separate base
+    # sheet), so it is the modelled input for the year.
+    "variable-paths-for-the-2025-bank-capital-stress-test.xlsx": [
+        _SheetConfig(
+            "Macroeconomic variables",
+            1,
+            "scenario-2025-stress.csv",
+            2025,
+            "stress",
+            True,
+            _RENAMES_2025,
         ),
     ],
 }

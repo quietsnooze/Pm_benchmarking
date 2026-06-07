@@ -78,6 +78,9 @@ The downloader (`python -m uk_stress_benchmark.sync_sources`) parses the bullet 
 - `stress-testing-the-uk-banking-system-variable-paths-for-the-2018-scenario.xlsx` → <https://www.bankofengland.co.uk/-/media/boe/files/stress-testing/2018/stress-testing-the-uk-banking-system-variable-paths-for-the-2018-scenario.xlsx>
 - `stress-testing-the-uk-banking-system-variable-paths-for-the-2019-scenario.xlsx` → <https://www.bankofengland.co.uk/-/media/boe/files/stress-testing/2019/stress-testing-the-uk-banking-system-variable-paths-for-the-2019-scenario.xlsx>
 - `variable-paths-for-firms-not-participating-in-2019-concurrent-stress-test.XLSX` → <https://www.bankofengland.co.uk/-/media/boe/files/stress-testing/2019/variable-paths-for-firms-not-participating-in-2019-concurrent-stress-test.xlsx>
+- `stress-testing-the-uk-banking-system-variable-paths-for-the-2021-scenario.xlsx` → <https://www.bankofengland.co.uk/-/media/boe/files/stress-testing/2021/variable-paths-for-the-2021-stress-test.xlsx>
+- `stress-testing-the-uk-banking-system-variable-paths-for-the-2022-scenarios.xlsx` → <https://www.bankofengland.co.uk/-/media/boe/files/stress-testing/2023/variable-paths-for-the-2022-scenarios.xlsx>
+- `variable-paths-for-the-2025-bank-capital-stress-test.xlsx` → <https://www.bankofengland.co.uk/-/media/boe/files/stress-testing/2025/variable-paths-for-the-2025-bank-capital-stress-test.xlsx>
 - `november-2018.pdf` → <https://www.bankofengland.co.uk/-/media/boe/files/financial-stability-report/2018/november-2018.pdf>
 - `december-2019.pdf` → <https://www.bankofengland.co.uk/-/media/boe/files/financial-stability-report/2019/december-2019.pdf>
 - `mortgages-estimating-default-correlation-and-forecasting-default-risk.pdf` → <https://www.bankofengland.co.uk/-/media/boe/files/working-paper/2018/mortgages-estimating-default-correlation-and-forecasting-default-risk.pdf>
@@ -95,6 +98,46 @@ These files have no public URL — they're hand-compiled summaries Pete put toge
 | Source XLSX | Transcription script | Output CSV | Provides |
 | --- | --- | --- | --- |
 | `old_version/stress test benchmarks/pillar 3 disclosures/2019 provisions coverage by firm.xlsx` | [scripts/derive_firm_provisions.py](scripts/derive_firm_provisions.py) | `processed_inputs/firm_provisions.csv` | `firm_name`, `mort_prov_coverage`, `retail_prov_coverage`, `commercial_prov_coverage` for each of the seven UK banks. SCB has only `commercial_prov_coverage` populated (a flagged "guesstimate" in the source). |
+
+### 2021 Solvency Stress Test — scenario only (not a training year)
+
+The 2021 SST *scenario* is ingested (`scenario-2021-stress.csv`, in the manifest)
+for what-if / coverage, but its bank-specific results are **deliberately not
+pooled into the regression**: the 2021 SST is a COVID-recovery scenario whose
+milder path destabilises the pooled fit, so by decision it is scenario-only.
+Hence there is no `2021_table-*.csv`. (For the record, the results exist as
+Annex 2 Table A2.A of the *2021 solvency stress test results: annex*, same
+four-product shape as the other years.) Note the 2021 SST scenario is a single
+severe macro path — not the 2021 Climate Biennial Exploratory Scenario, which
+is a separate exercise with EA/LA/NAA pathways.
+
+### 2022/23 ACS — bank-specific impairment charges
+
+`processed_inputs/2022_table-A2A.csv` was transcribed from **Annex 2, Table
+A2.A** of the *2022/23 ACS stress-test results: Annex* (finalised 11 July 2023).
+Only the seven group-level firms are kept; the ring-fenced subsidiaries
+(Barclays Bank UK, HSBC UK Bank) and standalone Virgin Money UK are dropped to
+match the legacy 2014-2019 group-level firm set. Same `firm, col_1..col_4`
+shape and four products as the legacy tables. `NatWest Group` is canonicalised
+to `The Royal Bank of Scotland Group`. Transcribed (not `extract-tables`-parsed)
+because the new annex layout differs from the 2014-2019 annex the extractor
+understands; see the follow-up to extend `extract-tables` to the A2/A3 annexes.
+
+### 2025 Bank Capital Stress Test — bank-specific impairment charges
+
+`processed_inputs/2025_table-A31.csv` was transcribed by hand from **Annex 3,
+Table A3.1** ("Projected cumulative five-year impairment charge rates on UK
+lending in the stress scenario") of the 2 December 2025 *Bank Capital Stress
+Test results* annex. It is kept in the same `firm, col_1..col_4` shape the
+`extract-tables` step produces (mortgage / non-mortgage retail / CRE / business
+excluding CRE), so `aggregate-firm-results` picks it up like any other year.
+
+Transcribed rather than extracted because the annex PDF would not download at
+build time; if the PDF (`...2025...bank-capital-stress-test...annex.pdf`) is
+later obtained, add it to the verified-URLs list and let `extract-tables`
+regenerate the CSV to confirm the transcription. Per the annex's own footnote,
+the "Nationwide" figures include Virgin Money UK heritage, and "NatWest Group"
+is canonicalised to "The Royal Bank of Scotland Group" for cross-era continuity.
 
 ## TBD — origin not confirmed
 

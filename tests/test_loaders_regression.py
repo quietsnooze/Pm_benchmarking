@@ -15,8 +15,30 @@ import pytest
 
 from uk_stress_benchmark.provisions import load_provisions
 from uk_stress_benchmark.results import load_results
+from uk_stress_benchmark.scenario_index import modelling_paths
 
 PROCESSED = Path(__file__).resolve().parent.parent / "processed_inputs"
+
+
+def test_manifest_resolves_the_newer_scenarios_to_existing_csvs():
+    paths = modelling_paths(PROCESSED)
+    for year, name in [
+        (2021, "scenario-2021-stress.csv"),
+        (2022, "scenario-2022-stress.csv"),
+        (2025, "scenario-2025-stress.csv"),
+    ]:
+        assert year in paths, f"{year} should be a modelled scenario in the manifest"
+        assert paths[year].name == name
+        assert paths[year].exists()
+
+
+def test_2021_is_scenario_coverage_only_not_a_training_year():
+    # The 2021 Solvency Stress Test scenario is registered (available for
+    # what-if / app coverage), but its results are deliberately not pooled into
+    # the regression, so it must appear in the manifest yet not in firm_results.
+    assert 2021 in modelling_paths(PROCESSED)
+    results = load_results(PROCESSED / "firm_results.csv")
+    assert 2021 not in set(results["acsyear"])
 
 
 @pytest.fixture(scope="module")
@@ -29,9 +51,15 @@ def real_provisions() -> pd.DataFrame:
     return load_provisions(PROCESSED / "firm_provisions.csv")
 
 
-def test_real_firm_results_loads_and_covers_2014_to_2019(real_results: pd.DataFrame):
-    years = sorted(real_results["acsyear"].unique())
-    assert years == [2014, 2015, 2016, 2017, 2018, 2019]
+def test_real_firm_results_covers_the_legacy_and_newer_years(real_results: pd.DataFrame):
+    years = set(real_results["acsyear"].unique())
+    # The original 2014-2019 ACS series must always be present...
+    assert {2014, 2015, 2016, 2017, 2018, 2019}.issubset(years)
+    # ...along with the newer years pooled as training (2022/23 ACS, 2025 BCST).
+    assert {2022, 2025}.issubset(years)
+    # 2021 SST is intentionally NOT a training year (scenario-only); see
+    # test_2021_is_scenario_coverage_only_not_a_training_year.
+    assert 2021 not in years
 
 
 def test_real_firm_results_imputes_2014_5yr_from_3yr(real_results: pd.DataFrame):
