@@ -112,7 +112,7 @@ def _parse_pct_value(raw: object) -> float:
     0.007). "-" (hyphen) and "–" (en dash) are the source-PDF conventions
     for "not applicable" and become NaN.
     """
-    if raw is None or pd.isna(raw):
+    if raw is None or bool(pd.isna(raw)):
         return float("nan")
     text = str(raw).strip()
     if text in {"-", "–", ""}:
@@ -166,7 +166,11 @@ def build_firm_results(processed_dir: Path) -> pd.DataFrame:
     for col in _OUTPUT_COLS:
         if col not in frame.columns:
             frame[col] = float("nan")
-    return frame[list(_OUTPUT_COLS)].sort_values(["acsyear", "firm_name"]).reset_index(drop=True)
+    return (
+        frame.loc[:, list(_OUTPUT_COLS)]
+        .sort_values(["acsyear", "firm_name"])
+        .reset_index(drop=True)
+    )
 
 
 def main() -> None:

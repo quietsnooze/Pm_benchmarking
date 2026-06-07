@@ -132,4 +132,4 @@ def test_predict_with_model_uses_only_columns_the_model_kept():
     score_df = pd.DataFrame({"x": [0.0, 5.0, 10.0]})  # no "noise" column
     scored = predict_with_model(score_df, model)
     assert "prediction" in scored.columns
-    assert scored["prediction"].notna().all()
+    assert bool(scored["prediction"].notna().all())

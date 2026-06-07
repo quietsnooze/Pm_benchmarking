@@ -19,6 +19,7 @@ Public surface:
 from __future__ import annotations
 
 import re
+from typing import cast
 
 import pandas as pd
 import statsmodels.api as sm
@@ -97,10 +98,10 @@ def fit_linear_model(
             if col not in predictors:
                 predictors.append(col)
 
-    fit_df = df[[dependent_var] + predictors].dropna()
+    fit_df = df.loc[:, [dependent_var] + predictors].dropna()
     y = fit_df[dependent_var]
-    X = sm.add_constant(fit_df[predictors].astype(float), has_constant="add")
-    model = sm.OLS(y, X).fit()
+    X = cast(pd.DataFrame, sm.add_constant(fit_df[predictors].astype(float), has_constant="add"))
+    model = cast(RegressionResults, sm.OLS(y, X).fit())
 
     if stepwise:
         model = _backward_eliminate_by_aic(y, X)
@@ -113,17 +114,20 @@ def _backward_eliminate_by_aic(y: pd.Series, X: pd.DataFrame) -> RegressionResul
 
     The intercept (``const``) is held fixed and never eliminated.
     """
-    best = sm.OLS(y, X).fit()
+    best = cast(RegressionResults, sm.OLS(y, X).fit())
     candidates = [c for c in X.columns if c != "const"]
 
     while candidates:
-        best_aic = best.aic
+        # statsmodels stubs type .aic as float | None; a fitted OLS always
+        # has a finite AIC, so treat it as float for a well-typed comparison.
+        best_aic = cast(float, best.aic)
         drop_col = None
         for col in candidates:
             trial_cols = ["const"] + [c for c in candidates if c != col]
-            trial = sm.OLS(y, X[trial_cols]).fit()
-            if trial.aic < best_aic:
-                best_aic = trial.aic
+            trial = cast(RegressionResults, sm.OLS(y, X[trial_cols]).fit())
+            trial_aic = cast(float, trial.aic)
+            if trial_aic < best_aic:
+                best_aic = trial_aic
                 drop_col = col
                 best = trial
         if drop_col is None:

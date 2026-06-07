@@ -28,12 +28,7 @@ jobs:
       - name: Ruff lint
         run: uv run ruff check
 
-      # Non-blocking for now: there are ~36 pre-existing pyright errors (mostly
-      # pandas/plotly dynamic-attribute friction in basic mode). The signal is
-      # kept visible in the run, but isn't gating merges until those are cleared.
-      # Flip to a hard gate by removing continue-on-error once the count is zero.
-      - name: Pyright type check (informational)
-        continue-on-error: true
+      - name: Pyright type check
         run: uv run pyright
 
       - name: Pytest

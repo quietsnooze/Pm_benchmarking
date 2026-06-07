@@ -37,13 +37,13 @@ def test_real_firm_results_loads_and_covers_2014_to_2019(real_results: pd.DataFr
 def test_real_firm_results_imputes_2014_5yr_from_3yr(real_results: pd.DataFrame):
     # 2014 BoE published only 3yr rates; imputation must populate the 5yr cols
     # for the three imputable products (mortgage / retail / CRE).
-    yr2014 = real_results[real_results["acsyear"] == 2014]
+    yr2014 = real_results.loc[real_results["acsyear"] == 2014]
     assert not yr2014.empty
-    assert yr2014["uk_mort_5yr_ic_pct"].notna().all()
-    assert yr2014["uk_retail_5yr_ic_pct"].notna().all()
-    assert yr2014["uk_cre_5yr_ic_pct"].notna().all()
+    assert bool(yr2014["uk_mort_5yr_ic_pct"].notna().all())
+    assert bool(yr2014["uk_retail_5yr_ic_pct"].notna().all())
+    assert bool(yr2014["uk_cre_5yr_ic_pct"].notna().all())
     # Business lending has no 3yr analogue — must remain NaN for 2014.
-    assert yr2014["uk_bus_5yr_ic_pct"].isna().all()
+    assert bool(yr2014["uk_bus_5yr_ic_pct"].isna().all())
 
 
 def test_real_firm_provisions_preserves_standard_chartered_nans(

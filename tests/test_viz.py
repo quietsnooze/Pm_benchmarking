@@ -22,7 +22,7 @@ def _toy_predictions() -> pd.DataFrame:
 def test_actual_vs_expected_figure_returns_a_plotly_figure_with_title():
     fig = actual_vs_expected_figure(_toy_predictions(), title="Mortgage AvE")
     assert isinstance(fig, go.Figure)
-    assert fig.layout.title.text == "Mortgage AvE"
+    assert fig.layout["title"]["text"] == "Mortgage AvE"
 
 
 def test_actual_vs_expected_figure_includes_every_input_row():
@@ -44,7 +44,7 @@ def test_actual_vs_expected_figure_axes_share_a_common_range():
     # share the same range.
     df = _toy_predictions()
     fig = actual_vs_expected_figure(df, title="Test")
-    assert fig.layout.xaxis.range == fig.layout.yaxis.range
+    assert fig.layout["xaxis"]["range"] == fig.layout["yaxis"]["range"]
 
 
 def test_actual_vs_expected_figure_handles_nan_predictions():
@@ -69,7 +69,7 @@ def test_predictions_heatmap_returns_figure_with_firms_and_products():
     )
     fig = predictions_heatmap(predictions, title="Test")
     assert isinstance(fig, go.Figure)
-    assert fig.layout.title.text == "Test"
+    assert fig.layout["title"]["text"] == "Test"
     # Heatmap data x-axis covers products, y-axis covers firms.
     heatmap_trace = fig.data[0]
     assert set(heatmap_trace.x) == {"Mortgage", "Retail"}
