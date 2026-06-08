@@ -221,8 +221,8 @@ def predict_for_scenario(
         product.
     firms_df : pd.DataFrame
         One row per firm carrying everything firm-level the models need:
-        the original ``firm_name`` column, the three ``*_prov_coverage``
-        columns, and the ``firm_name_*`` dummy columns produced by
+        the original ``firm_name`` column and the ``firm_name_*`` dummy
+        columns produced by
         :func:`uk_stress_benchmark.models.add_dummies`. Typically built by
         ``modelling_df.drop_duplicates("firm_name")``.
 
