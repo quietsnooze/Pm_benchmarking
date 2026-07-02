@@ -29,7 +29,7 @@ from uk_stress_benchmark.pipeline import (
     predict_for_scenario,
     year_benchmark,
 )
-from uk_stress_benchmark.provisions import load_provisions
+from uk_stress_benchmark.provisions import load_btl, load_provisions
 from uk_stress_benchmark.results import load_results
 from uk_stress_benchmark.scenario_index import modelling_paths
 from uk_stress_benchmark.scenarios import build_low_point_shocks
@@ -204,10 +204,11 @@ def _step_header(number: int, title: str) -> None:
 
 
 @st.cache_data(show_spinner="Loading firm results / provisions…")
-def _load_firm_data() -> tuple[pd.DataFrame, pd.DataFrame]:
+def _load_firm_data() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     return (
         load_results(PROCESSED / "firm_results.csv"),
         load_provisions(PROCESSED / "firm_provisions.csv"),
+        load_btl(PROCESSED / "firm_btl.csv"),
     )
 
 
@@ -222,9 +223,9 @@ def _load_shocks() -> pd.DataFrame:
 
 @st.cache_resource(show_spinner="Calibrating the benchmark…")
 def _fit_everything() -> tuple[pd.DataFrame, dict]:
-    results, provisions = _load_firm_data()
+    results, provisions, btl = _load_firm_data()
     shocks = _load_shocks()
-    modelling_df = build_modelling_dataset(results, shocks, provisions)
+    modelling_df = build_modelling_dataset(results, shocks, provisions, btl=btl)
     fitted = fit_product_models(modelling_df)
     return modelling_df, fitted
 
@@ -428,20 +429,38 @@ for (cov_col, label, help_text), ui_col in zip(_COVERAGE_INPUTS, coverage_cols, 
         )
     coverage_inputs[cov_col] = entered / 100
 
+# Buy-to-let share of the mortgage book is a structural mortgage-risk input.
+# It's only rendered as a live control when the fitted mortgage model
+# actually selected it (backward-AIC may drop it); otherwise your firm
+# inherits the peer-median share so predictions still resolve and we don't
+# show a control that moves nothing.
+peer_btl_median = float(pd.Series(firms_df["btl_share"]).median())
+if "btl_share" in fitted_models["mortgage"].params.index:
+    btl_entered = st.number_input(
+        "Buy-to-let share of mortgage book (%)",
+        min_value=0.0,
+        max_value=100.0,
+        value=round(peer_btl_median * 100, 1),
+        step=1.0,
+        format="%.1f",
+        help=(
+            "Buy-to-let balances as a share of your mortgage book. A higher BTL "
+            "share tends to raise modelled stressed mortgage losses."
+        ),
+    )
+    your_btl = btl_entered / 100
+else:
+    your_btl = peer_btl_median
+firm_inputs = {**coverage_inputs, "btl_share": your_btl}
+
 # --- Step 3: the benchmark ----------------------------------------------------
 
 _step_header(3, "Read the benchmark")
 
 if is_custom:
     models_in_use = fitted_models if calibration == "all" else recent_models
-    scoring_df = _with_your_firm(firms_df, coverage_inputs)
-    # A custom scenario has no test year of its own, so evaluate any time
-    # trend the models kept "as of the latest published test". The trend is
-    # a scenario-level scalar centred on the earliest year, so its latest
-    # value is simply the maximum in the modelling data. Models where
-    # stepwise dropped the trend ignore this key.
-    year_shock = {"years_since_first_test": float(modelling_df["years_since_first_test"].max())}
-    predictions = predict_for_scenario(models_in_use, {**shock_values, **year_shock}, scoring_df)
+    scoring_df = _with_your_firm(firms_df, firm_inputs)
+    predictions = predict_for_scenario(models_in_use, shock_values, scoring_df)
     _recent_list = ", ".join(str(y) for y in recent_years)
     calibration_note = (
         f"calibrated on every published stress test ({year_lo}–{year_hi})"
@@ -507,11 +526,11 @@ scenario and your coverage levels.
 **Firm identity is deliberately excluded.** No model is allowed to rate a firm
 as riskier than its peers on the strength of its name — every prediction is
 driven only by the scenario and the loan book you describe, never by who you
-are. A single continuous **time trend** (years since the first test) is also
-offered to each product and retained by AIC only where it earns its place,
-letting the fit express whether stress outcomes have drifted over the
-programme's life without overfitting to any individual year; custom scenarios
-evaluate that trend as of the most recent published test.
+are. The mortgage model additionally offers each firm's **buy-to-let share**
+of its mortgage book — a structural risk driver the macro shocks and provision
+coverage don't capture — as a stepwise candidate, kept only if it improves the
+fit. It is a single static figure per firm (see the source notes on GitHub),
+applied across every year rather than tracked test-by-test.
 
 Three calibrations sit behind the scenario picker. A **custom scenario** uses
 the cross-scenario model above, fitted either to every published test (the

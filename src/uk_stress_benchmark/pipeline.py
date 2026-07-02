@@ -45,6 +45,7 @@ def build_modelling_dataset(
     shocks: pd.DataFrame,
     provisions: pd.DataFrame,
     *,
+    btl: pd.DataFrame | None = None,
     exclude_firms: tuple[str, ...] = _DEFAULT_EXCLUDE,
 ) -> pd.DataFrame:
     """Assemble the per-firm-per-acsyear regression dataset.
@@ -62,6 +63,15 @@ def build_modelling_dataset(
     provisions : pd.DataFrame
         Output of :func:`uk_stress_benchmark.provisions.load_provisions`.
         One row per firm, with the three ``*_prov_coverage`` columns.
+    btl : pd.DataFrame | None, default ``None``
+        Output of :func:`uk_stress_benchmark.provisions.load_btl` — one row
+        per firm with a ``btl_share`` column (buy-to-let proportion of the
+        mortgage book). A static per-firm attribute broadcast across every
+        year (the same figure applies to all of a firm's rows). Merged with
+        a left join so a firm missing a BTL figure keeps its rows with a
+        NaN ``btl_share`` (only the mortgage fit, which uses the column,
+        drops that firm-year). When ``None`` the column is still created,
+        filled with NaN, so the mortgage recipe never hits a missing column.
     exclude_firms : tuple[str, ...]
         Firms to drop from the dataset before modelling. Match is
         case-insensitive on ``firm_name``. Default is
@@ -85,16 +95,14 @@ def build_modelling_dataset(
     excludes_lower = {f.lower() for f in exclude_firms}
     df = df.loc[~df["firm_name"].str.lower().isin(excludes_lower)].reset_index(drop=True)
 
-    # Time trend as a single continuous feature: years elapsed since the
-    # earliest test in the dataset. One degree of freedom (unlike a
-    # per-year dummy set), so a product model can express "tests got
-    # easier/harder over time" without overfitting to each individual
-    # year. Centred on the earliest year purely for readability — the
-    # coefficient then reads as impairment change per year since the
-    # programme began, and the intercept stays interpretable. Prediction
-    # code reads the max of this column to evaluate "as of the latest
-    # test", so the centring origin never has to be hard-coded elsewhere.
-    df["years_since_first_test"] = df["acsyear"] - df["acsyear"].min()
+    # BTL share is a static per-firm attribute; broadcast it across the
+    # firm's rows via a left join so a missing figure never drops a firm
+    # from products that don't use it. Always materialise the column so the
+    # mortgage recipe can reference it unconditionally.
+    if btl is not None:
+        df = df.merge(btl.loc[:, ["firm_name", "btl_share"]], on="firm_name", how="left")
+    else:
+        df["btl_share"] = float("nan")
 
     df = add_dummies(df, "firm_name")
     return df
@@ -134,10 +142,11 @@ class ProductRecipe:
 #     a firm as riskier than its peers on the strength of its name alone;
 #     the general firm-dummy machinery in :func:`add_dummies` is retained
 #     for research but no default recipe keys off firm identity.
-#   * A single continuous ``years_since_first_test`` trend is offered to
-#     every model, letting the fit express whether stress outcomes have
-#     drifted over the programme's life. It is a stepwise candidate, so
-#     backward-AIC keeps it only where it earns its place.
+#   * The mortgage model gains ``btl_share`` — the buy-to-let proportion
+#     of a firm's mortgage book — a structural risk driver the macro
+#     shocks and provision coverage don't capture. It is a static per-firm
+#     attribute (see :func:`uk_stress_benchmark.provisions.load_btl`) and a
+#     stepwise candidate like every other predictor.
 RECIPES: dict[str, ProductRecipe] = {
     "mortgage": ProductRecipe(
         dependent_var="uk_mort_5yr_ic_pct",
@@ -146,9 +155,9 @@ RECIPES: dict[str, ProductRecipe] = {
             "uk_unemployment_rate_pct_rise",
             "uk_unemployment_rate_pct_fall",
             "mort_prov_coverage",
+            "btl_share",
             "uk_bank_rate_pct_rise",
             "uk_bank_rate_pct_fall",
-            "years_since_first_test",
         ),
     ),
     "retail": ProductRecipe(
@@ -158,7 +167,6 @@ RECIPES: dict[str, ProductRecipe] = {
             "uk_bank_rate_pct_rise",
             "uk_bank_rate_pct_fall",
             "retail_prov_coverage",
-            "years_since_first_test",
         ),
     ),
     "cre": ProductRecipe(
@@ -171,7 +179,6 @@ RECIPES: dict[str, ProductRecipe] = {
             "uk_unemployment_rate_pct_fall",
             "uk_bank_rate_pct_rise",
             "uk_bank_rate_pct_fall",
-            "years_since_first_test",
         ),
         exclude_firms=("Nationwide",),
     ),
@@ -185,7 +192,6 @@ RECIPES: dict[str, ProductRecipe] = {
             "uk_unemployment_rate_pct_fall",
             "uk_bank_rate_pct_rise",
             "uk_bank_rate_pct_fall",
-            "years_since_first_test",
         ),
     ),
 }

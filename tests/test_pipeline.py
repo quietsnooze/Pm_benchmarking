@@ -16,7 +16,7 @@ from uk_stress_benchmark.pipeline import (
     predict_for_scenario,
     year_benchmark,
 )
-from uk_stress_benchmark.provisions import load_provisions
+from uk_stress_benchmark.provisions import load_btl, load_provisions
 from uk_stress_benchmark.results import load_results
 from uk_stress_benchmark.scenario_index import modelling_paths
 from uk_stress_benchmark.scenarios import build_low_point_shocks
@@ -95,25 +95,48 @@ def test_build_modelling_dataset_excludes_are_case_insensitive():
     assert "HSBC" in firms
 
 
-def test_build_modelling_dataset_adds_year_trend_centred_on_earliest_year():
-    # Year enters the models as a single continuous trend, not a per-year
-    # dummy — one degree of freedom, so it can't overfit to each test. It is
-    # centred on the dataset's earliest year so the coefficient reads as
-    # "change in impairment per year since the programme began".
+def _toy_btl() -> pd.DataFrame:
+    return pd.DataFrame(
+        {
+            "firm_name": ["Barclays", "HSBC", "Nationwide"],
+            "btl_share": [0.10, 0.02, 0.15],
+        }
+    )
+
+
+def test_build_modelling_dataset_broadcasts_btl_share_across_a_firms_years():
+    # BTL share is a static per-firm attribute: the same figure attaches to
+    # every one of a firm's rows, regardless of stress-test year.
+    df = build_modelling_dataset(_toy_results(), _toy_shocks(), _toy_provisions(), btl=_toy_btl())
+    assert "btl_share" in df.columns
+    barclays = df.loc[df["firm_name"] == "Barclays"]
+    assert len(barclays) == 2  # 2017 and 2018
+    assert barclays["btl_share"].tolist() == pytest.approx([0.10, 0.10])
+
+
+def test_build_modelling_dataset_left_joins_btl_so_a_missing_firm_is_kept():
+    # A firm absent from the BTL file keeps its rows (with NaN btl_share) —
+    # only the mortgage fit, which uses the column, drops that firm-year;
+    # the other products are unaffected.
+    btl_missing_hsbc = _toy_btl().loc[lambda d: d["firm_name"] != "HSBC"]
+    df = build_modelling_dataset(
+        _toy_results(), _toy_shocks(), _toy_provisions(), btl=btl_missing_hsbc
+    )
+    hsbc = df.loc[df["firm_name"] == "HSBC"]
+    assert not hsbc.empty
+    assert bool(hsbc["btl_share"].isna().all())
+
+
+def test_build_modelling_dataset_materialises_btl_column_even_without_data():
+    # With no BTL frame the column still exists (all NaN) so the mortgage
+    # recipe can reference it unconditionally.
     df = build_modelling_dataset(_toy_results(), _toy_shocks(), _toy_provisions())
-    assert "years_since_first_test" in df.columns
-    by_year = df.drop_duplicates("acsyear").set_index("acsyear")["years_since_first_test"]
-    # Toy data spans 2017-2018; earliest year -> 0.
-    assert by_year.loc[2017] == pytest.approx(0.0)
-    assert by_year.loc[2018] == pytest.approx(1.0)
+    assert "btl_share" in df.columns
+    assert bool(df["btl_share"].isna().all())
 
 
-def test_recipes_offer_the_year_trend_as_a_predictor():
-    # Every product model can pick up the time trend; backward-AIC decides
-    # whether it earns its place (see stepwise=True default).
-    for name, recipe in RECIPES.items():
-        assert "years_since_first_test" in recipe.independent_vars, name
-        assert recipe.stepwise, name
+def test_mortgage_recipe_includes_btl_share():
+    assert "btl_share" in RECIPES["mortgage"].independent_vars
 
 
 def test_recipes_carry_no_firm_name_predictors():
@@ -177,7 +200,8 @@ def real_modelling_df() -> pd.DataFrame:
     )
     results = load_results(PROCESSED / "firm_results.csv")
     provisions = load_provisions(PROCESSED / "firm_provisions.csv")
-    return build_modelling_dataset(results, shocks, provisions)
+    btl = load_btl(PROCESSED / "firm_btl.csv")
+    return build_modelling_dataset(results, shocks, provisions, btl=btl)
 
 
 def test_real_modelling_dataset_has_expected_firms_and_acsyears(
@@ -259,20 +283,13 @@ def test_predict_for_scenario_holds_firm_features_constant_per_firm(
 def test_real_fitted_models_have_sensible_coefficient_signs(
     real_modelling_df: pd.DataFrame,
 ):
-    # Asserted only for predictors that (a) survive stepwise and (b) are
-    # statistically significant. Backward-AIC can retain a predictor whose
-    # coefficient is indistinguishable from zero; such a term makes no
-    # directional claim, so its sign carries no domain meaning and pinning
-    # it just tests noise. (Concretely: offering the year trend as a
-    # candidate perturbs the mortgage AIC path onto a p~=0.16 unemployment
-    # term whose sign is meaningless.) The guard still bites on any
-    # *significant* wrong-signed coefficient. The signs encode domain
-    # logic: pct_fall is signed negative (a fall is a negative percent
-    # change), so for falls to *drive* losses the coefficient on a
-    # *_pct_fall predictor must be non-positive (so coef * negative_pct_fall
-    # yields a positive contribution to the impairment-charge target).
-    # Symmetrically, *_pct_rise on unemployment should be non-negative.
-    significance = 0.10
+    # Asserted only when stepwise hasn't dropped the predictor — robust to
+    # AIC-driven shrinkage. The signs encode domain logic: pct_fall is
+    # signed negative (a fall is a negative percent change), so for falls
+    # to *drive* losses the coefficient on a *_pct_fall predictor must be
+    # non-positive (so coef * negative_pct_fall yields a positive
+    # contribution to the impairment-charge target). Symmetrically,
+    # *_pct_rise on unemployment should be non-negative.
     fitted = fit_product_models(real_modelling_df)
     sensible_signs: dict[str, dict[str, str]] = {
         "mortgage": {
@@ -287,13 +304,10 @@ def test_real_fitted_models_have_sensible_coefficient_signs(
         },
     }
     for product, expectations in sensible_signs.items():
-        model = fitted[product]
-        params = model.params
+        params = fitted[product].params
         for predictor, expected in expectations.items():
             if predictor not in params.index:
                 continue  # stepwise dropped it - nothing to assert
-            if model.pvalues[predictor] > significance:
-                continue  # not significant - no directional claim to check
             value = params[predictor]
             if expected == "non-positive":
                 assert value <= 1e-9, f"{product}.{predictor} = {value}"
@@ -301,37 +315,32 @@ def test_real_fitted_models_have_sensible_coefficient_signs(
                 assert value >= -1e-9, f"{product}.{predictor} = {value}"
 
 
-def test_predict_for_scenario_evaluates_the_year_trend_from_shock_values():
-    # A model carrying the year trend must move its prediction when the
-    # caller passes a different year via shock_values — this is how the app
-    # evaluates a custom scenario "as of the latest test". The year is a
-    # scenario-level scalar, so it rides in shock_values alongside the macro
-    # shocks and is broadcast across every firm.
+def test_predict_for_scenario_uses_each_firms_own_btl_share():
+    # BTL share is a per-firm attribute carried on firms_df (not a scenario
+    # scalar), so a mortgage model that keeps it must give a higher charge
+    # to the higher-BTL firm, all else equal.
     firms = pd.DataFrame(
         {
-            "firm_name": ["A", "B"],
-            "mort_prov_coverage": [0.002, 0.004],
-            "years_since_first_test": [0.0, 1.0],
+            "firm_name": ["LowBTL", "HighBTL"],
+            "mort_prov_coverage": [0.003, 0.003],
+            "btl_share": [0.02, 0.20],
         }
     )
     train = pd.DataFrame(
         {
-            "years_since_first_test": [0.0, 0.0, 1.0, 1.0, 2.0, 2.0],
-            "mort_prov_coverage": [0.002, 0.004, 0.002, 0.004, 0.002, 0.004],
-            "uk_mort_5yr_ic_pct": [0.010, 0.012, 0.020, 0.022, 0.030, 0.032],
+            "btl_share": [0.02, 0.20, 0.02, 0.20, 0.02, 0.20],
+            "mort_prov_coverage": [0.002, 0.002, 0.003, 0.003, 0.004, 0.004],
+            "uk_mort_5yr_ic_pct": [0.010, 0.030, 0.012, 0.032, 0.014, 0.034],
         }
     )
     model = fit_linear_model(
         train,
         dependent_var="uk_mort_5yr_ic_pct",
-        independent_vars=["years_since_first_test", "mort_prov_coverage"],
+        independent_vars=["btl_share", "mort_prov_coverage"],
         stepwise=False,
     )
-    models = {"mortgage": model}
-    early = predict_for_scenario(models, {"years_since_first_test": 0.0}, firms)
-    late = predict_for_scenario(models, {"years_since_first_test": 2.0}, firms)
-    # Same firms and coverage, later test year -> higher predicted charge.
-    assert bool((late["mortgage"] > early["mortgage"]).all())
+    out = predict_for_scenario({"mortgage": model}, {}, firms)
+    assert out.loc["HighBTL", "mortgage"] > out.loc["LowBTL", "mortgage"]
 
 
 # ------------------------------ year benchmark ------------------------------
