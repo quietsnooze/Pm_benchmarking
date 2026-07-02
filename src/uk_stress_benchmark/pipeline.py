@@ -85,6 +85,17 @@ def build_modelling_dataset(
     excludes_lower = {f.lower() for f in exclude_firms}
     df = df.loc[~df["firm_name"].str.lower().isin(excludes_lower)].reset_index(drop=True)
 
+    # Time trend as a single continuous feature: years elapsed since the
+    # earliest test in the dataset. One degree of freedom (unlike a
+    # per-year dummy set), so a product model can express "tests got
+    # easier/harder over time" without overfitting to each individual
+    # year. Centred on the earliest year purely for readability — the
+    # coefficient then reads as impairment change per year since the
+    # programme began, and the intercept stays interpretable. Prediction
+    # code reads the max of this column to evaluate "as of the latest
+    # test", so the centring origin never has to be hard-coded elsewhere.
+    df["years_since_first_test"] = df["acsyear"] - df["acsyear"].min()
+
     df = add_dummies(df, "firm_name")
     return df
 
@@ -117,9 +128,16 @@ class ProductRecipe:
 
 # Recipes ported from the legacy ``stress testing v4.R`` workflow
 # (lines 63-148). Predictor lists preserve the original ordering for
-# readability vs the R source. ``firm_name_san_uk`` in the R source
-# becomes ``firm_name_santander_uk`` here because we keep full firm
-# names in the ingest layer.
+# readability vs the R source. Two deliberate departures from the R:
+#   * The firm-name fixed effect (``firm_name_san_uk`` in the R source)
+#     has been dropped from every model. A published benchmark cannot rate
+#     a firm as riskier than its peers on the strength of its name alone;
+#     the general firm-dummy machinery in :func:`add_dummies` is retained
+#     for research but no default recipe keys off firm identity.
+#   * A single continuous ``years_since_first_test`` trend is offered to
+#     every model, letting the fit express whether stress outcomes have
+#     drifted over the programme's life. It is a stepwise candidate, so
+#     backward-AIC keeps it only where it earns its place.
 RECIPES: dict[str, ProductRecipe] = {
     "mortgage": ProductRecipe(
         dependent_var="uk_mort_5yr_ic_pct",
@@ -128,9 +146,9 @@ RECIPES: dict[str, ProductRecipe] = {
             "uk_unemployment_rate_pct_rise",
             "uk_unemployment_rate_pct_fall",
             "mort_prov_coverage",
-            "firm_name_santander_uk",
             "uk_bank_rate_pct_rise",
             "uk_bank_rate_pct_fall",
+            "years_since_first_test",
         ),
     ),
     "retail": ProductRecipe(
@@ -140,6 +158,7 @@ RECIPES: dict[str, ProductRecipe] = {
             "uk_bank_rate_pct_rise",
             "uk_bank_rate_pct_fall",
             "retail_prov_coverage",
+            "years_since_first_test",
         ),
     ),
     "cre": ProductRecipe(
@@ -150,9 +169,9 @@ RECIPES: dict[str, ProductRecipe] = {
             "commercial_prov_coverage",
             "uk_unemployment_rate_pct_rise",
             "uk_unemployment_rate_pct_fall",
-            "firm_name_santander_uk",
             "uk_bank_rate_pct_rise",
             "uk_bank_rate_pct_fall",
+            "years_since_first_test",
         ),
         exclude_firms=("Nationwide",),
     ),
@@ -164,9 +183,9 @@ RECIPES: dict[str, ProductRecipe] = {
             "commercial_prov_coverage",
             "uk_unemployment_rate_pct_rise",
             "uk_unemployment_rate_pct_fall",
-            "firm_name_santander_uk",
             "uk_bank_rate_pct_rise",
             "uk_bank_rate_pct_fall",
+            "years_since_first_test",
         ),
     ),
 }

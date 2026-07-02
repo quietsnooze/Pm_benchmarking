@@ -435,7 +435,13 @@ _step_header(3, "Read the benchmark")
 if is_custom:
     models_in_use = fitted_models if calibration == "all" else recent_models
     scoring_df = _with_your_firm(firms_df, coverage_inputs)
-    predictions = predict_for_scenario(models_in_use, shock_values, scoring_df)
+    # A custom scenario has no test year of its own, so evaluate any time
+    # trend the models kept "as of the latest published test". The trend is
+    # a scenario-level scalar centred on the earliest year, so its latest
+    # value is simply the maximum in the modelling data. Models where
+    # stepwise dropped the trend ignore this key.
+    year_shock = {"years_since_first_test": float(modelling_df["years_since_first_test"].max())}
+    predictions = predict_for_scenario(models_in_use, {**shock_values, **year_shock}, scoring_df)
     _recent_list = ", ".join(str(y) for y in recent_years)
     calibration_note = (
         f"calibrated on every published stress test ({year_lo}–{year_hi})"
@@ -496,7 +502,16 @@ scenario's macro paths** (house prices, CRE prices, unemployment, GDP,
 corporate profits, Bank Rate) plus each firm's **pre-stress provision
 coverage** — one ordinary-least-squares model per product, with backward-AIC
 variable selection. Your benchmark is simply that model evaluated at your
-scenario and your coverage levels, with no firm-specific effects applied.
+scenario and your coverage levels.
+
+**Firm identity is deliberately excluded.** No model is allowed to rate a firm
+as riskier than its peers on the strength of its name — every prediction is
+driven only by the scenario and the loan book you describe, never by who you
+are. A single continuous **time trend** (years since the first test) is also
+offered to each product and retained by AIC only where it earns its place,
+letting the fit express whether stress outcomes have drifted over the
+programme's life without overfitting to any individual year; custom scenarios
+evaluate that trend as of the most recent published test.
 
 Three calibrations sit behind the scenario picker. A **custom scenario** uses
 the cross-scenario model above, fitted either to every published test (the
