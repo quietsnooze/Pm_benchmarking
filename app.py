@@ -27,6 +27,7 @@ from uk_stress_benchmark.pipeline import (
     build_modelling_dataset,
     fit_product_models,
     predict_for_scenario,
+    year_benchmark,
 )
 from uk_stress_benchmark.provisions import load_provisions
 from uk_stress_benchmark.results import load_results
@@ -37,6 +38,12 @@ from uk_stress_benchmark.viz import actual_vs_expected_figure, benchmark_strip_f
 PROCESSED = Path(__file__).resolve().parent / "processed_inputs"
 
 YOUR_FIRM = "Your firm"
+
+GITHUB_URL = "https://github.com/quietsnooze/Pm_benchmarking"
+LINKEDIN_URL = "https://www.linkedin.com/in/pemcintyre/"
+
+# Sentinel for the scenario picker's "design your own" entry.
+_CUSTOM = "custom"
 
 # Display names for the four modelled products, in reading order.
 _PRODUCT_LABELS: dict[str, str] = {
@@ -222,6 +229,29 @@ def _fit_everything() -> tuple[pd.DataFrame, dict]:
     return modelling_df, fitted
 
 
+@st.cache_resource(show_spinner="Calibrating on recent stress tests…")
+def _fit_recent_models() -> tuple[list[int], dict]:
+    """Alternative calibration: only the three most recent stress tests."""
+    mdf, _ = _fit_everything()
+    years = sorted(int(y) for y in pd.Series(mdf["acsyear"]).unique())[-3:]
+    recent = mdf.loc[pd.Series(mdf["acsyear"]).isin(years)]
+    return years, fit_product_models(recent)
+
+
+@st.cache_data
+def _published_years() -> list[int]:
+    """Years with genuinely published 5-year outcomes.
+
+    Loaded without the 5yr-from-3yr imputation the modelling dataset
+    uses, so a year whose "outcomes" are imputed (2014) is never offered
+    as a published benchmark.
+    """
+    raw = load_results(PROCESSED / "firm_results.csv", impute_missing=False)
+    dep_cols = [r.dependent_var for r in RECIPES.values()]
+    mask = raw[dep_cols].notna().any(axis=1)
+    return sorted(int(y) for y in raw.loc[mask, "acsyear"].unique())
+
+
 def _per_product_dataset(modelling_df: pd.DataFrame, product: str) -> pd.DataFrame:
     """Apply a recipe's per-product exclude (e.g. CRE drops Nationwide)."""
     recipe = RECIPES[product]
@@ -272,8 +302,8 @@ next to {", ".join(peer_firms[:-1])} and {peer_firms[-1]} — calibrated on ever
 firm-level result the Bank of England has published for its concurrent stress
 tests, {year_lo} to {year_hi}.</p>
 <p class="byline">Built by Peter McIntyre ·
-<a href="https://github.com/quietsnooze/Pm_benchmarking">Source &amp; methodology
-on GitHub</a></p>""",
+<a href="{LINKEDIN_URL}">LinkedIn</a> ·
+<a href="{GITHUB_URL}">Source &amp; methodology on GitHub</a></p>""",
     unsafe_allow_html=True,
 )
 
@@ -281,61 +311,96 @@ on GitHub</a></p>""",
 
 _step_header(1, "Set the scenario")
 
-pick_col, chips_col = st.columns([1, 2], vertical_alignment="bottom")
+published_years = _published_years()
+recent_years, recent_models = _fit_recent_models()
+
+
+def _scenario_label(choice: object) -> str:
+    if choice == _CUSTOM:
+        return "Design your own scenario"
+    return f"{choice} Bank of England stress test"
+
+
+pick_col, side_col = st.columns([1, 2], vertical_alignment="bottom")
 with pick_col:
-    scenario_year = st.selectbox(
-        "Start from a published stress test",
-        options=acs_years,
-        index=len(acs_years) - 1,
-        format_func=lambda y: f"{y} Bank of England scenario",
+    scenario_choice = st.selectbox(
+        "Scenario",
+        options=[*published_years, _CUSTOM],
+        index=len(published_years) - 1,
+        format_func=_scenario_label,
     )
 
-# Reset the shock sliders whenever the starting scenario changes, so the
-# sliders always re-anchor to the picked year's observed shocks.
-if st.session_state.get("_scenario_year") != scenario_year:
-    st.session_state["_scenario_year"] = scenario_year
-    for _slider_col, *_ in _SHOCK_SLIDERS:
-        st.session_state.pop(_slider_col, None)
+is_custom = scenario_choice == _CUSTOM
+calibration = "all"
+shock_values: dict[str, float] = {}
+scenario_year = int(st.session_state.get("_scenario_year", published_years[-1]))
 
-defaults_row = shocks_df.loc[scenario_year]
+if not is_custom:
+    scenario_year = int(scenario_choice)
+    # Remember the chosen year (and re-anchor the custom-mode sliders to
+    # it), so "show me ACS 2022, then tweak it" works by switching modes.
+    if st.session_state.get("_scenario_year") != scenario_year:
+        st.session_state["_scenario_year"] = scenario_year
+        for _slider_col, *_ in _SHOCK_SLIDERS:
+            st.session_state.pop(_slider_col, None)
 
-with chips_col:
-    chips = "".join(
-        f'<span class="chip"><span class="lbl">{label}</span>{defaults_row[col]:+.0%}</span>'
-        for col, label in _CHIP_SHOCKS
-        if col in defaults_row.index and pd.notna(defaults_row[col])
-    )
-    st.markdown(f'<div class="chips">{chips}</div>', unsafe_allow_html=True)
-
-with st.expander("Adjust the shocks"):
+    year_row = shocks_df.loc[scenario_year]
+    with side_col:
+        chips = "".join(
+            f'<span class="chip"><span class="lbl">{label}</span>{year_row[col]:+.0%}</span>'
+            for col, label in _CHIP_SHOCKS
+            if col in year_row.index and pd.notna(year_row[col])
+        )
+        st.markdown(f'<div class="chips">{chips}</div>', unsafe_allow_html=True)
     st.caption(
-        "Each shock is the worst point of the scenario's five-year path, as a "
-        "change from the starting level. Bank Rate moves are multiples of the "
-        "rate itself — a 5× rise of a 0.5% rate takes it to 3%."
+        "A published stress test's shocks are fixed — every firm faced the same "
+        "scenario. Pick “Design your own scenario” to move the shocks yourself."
     )
-    slider_cols = st.columns(2)
-    shock_values: dict[str, float] = {}
-    for i, (col, label, lo, hi, step, as_pct) in enumerate(_SHOCK_SLIDERS):
-        with slider_cols[i % 2]:
-            default_val = float(defaults_row.get(col, 0.0)) if col in defaults_row.index else 0.0
-            if as_pct:
-                default_val *= 100
-            # Clip default into the slider's range so it never throws.
-            default_val = max(lo, min(hi, default_val))
-            if as_pct:
-                fmt = "%.1f%%" if step < 1 else "%.0f%%"
-            else:
-                fmt = "×%.2f" if step < 0.5 else "×%.1f"
-            shown = st.slider(
-                label,
-                min_value=lo,
-                max_value=hi,
-                value=default_val,
-                step=step,
-                format=fmt,
-                key=col,
-            )
-            shock_values[col] = shown / 100 if as_pct else shown
+else:
+    with side_col:
+        calibration = st.selectbox(
+            "Calibration",
+            options=["all", "recent"],
+            format_func=lambda c: (
+                f"Model calibrated on all stress tests ({year_lo}–{year_hi})"
+                if c == "all"
+                else "Model calibrated on the last three "
+                f"({', '.join(str(y) for y in recent_years)})"
+            ),
+        )
+
+    defaults_row = shocks_df.loc[scenario_year]
+    with st.expander("Adjust the shocks", expanded=True):
+        st.caption(
+            f"Sliders start from the {scenario_year} stress test's shocks. Each "
+            "shock is the worst point of the scenario's five-year path, as a "
+            "change from the starting level. Bank Rate moves are multiples of "
+            "the rate itself — a 5× rise of a 0.5% rate takes it to 3%."
+        )
+        slider_cols = st.columns(2)
+        for i, (col, label, lo, hi, step, as_pct) in enumerate(_SHOCK_SLIDERS):
+            with slider_cols[i % 2]:
+                default_val = (
+                    float(defaults_row.get(col, 0.0)) if col in defaults_row.index else 0.0
+                )
+                if as_pct:
+                    default_val *= 100
+                # Clip default into the slider's range so it never throws.
+                default_val = max(lo, min(hi, default_val))
+                if as_pct:
+                    fmt = "%.1f%%" if step < 1 else "%.0f%%"
+                else:
+                    fmt = "×%.2f" if step < 0.5 else "×%.1f"
+                shown = st.slider(
+                    label,
+                    min_value=lo,
+                    max_value=hi,
+                    value=default_val,
+                    step=step,
+                    format=fmt,
+                    key=col,
+                )
+                shock_values[col] = shown / 100 if as_pct else shown
 
 # --- Step 2: your firm --------------------------------------------------------
 
@@ -367,26 +432,52 @@ for (cov_col, label, help_text), ui_col in zip(_COVERAGE_INPUTS, coverage_cols, 
 
 _step_header(3, "Read the benchmark")
 
-scoring_df = _with_your_firm(firms_df, coverage_inputs)
-predictions = predict_for_scenario(fitted_models, shock_values, scoring_df)
-predictions = predictions.rename(columns=_PRODUCT_LABELS).loc[:, list(_PRODUCT_LABELS.values())]
+if is_custom:
+    models_in_use = fitted_models if calibration == "all" else recent_models
+    scoring_df = _with_your_firm(firms_df, coverage_inputs)
+    predictions = predict_for_scenario(models_in_use, shock_values, scoring_df)
+    _recent_list = ", ".join(str(y) for y in recent_years)
+    calibration_note = (
+        f"calibrated on every published stress test ({year_lo}–{year_hi})"
+        if calibration == "all"
+        else f"calibrated on the last three stress tests ({_recent_list})"
+    )
+    st.markdown(
+        f"Predicted five-year impairment charge, as a percentage of each book, "
+        f"under your custom scenario — {calibration_note}. "
+        f"The gilt diamond is your firm."
+    )
+    scale_note = (
+        "Note that each panel has its own scale — mortgage loss rates are an order of "
+        "magnitude smaller than unsecured retail. Predictions can dip below zero "
+        "where the scenario sits outside the calibration range; read those as "
+        "'negligible', not as a forecast of write-backs."
+    )
+else:
+    predictions = year_benchmark(modelling_df, scenario_year, coverage_inputs)
+    st.markdown(
+        f"Peer dots show the **actual published results** of the {scenario_year} "
+        f"stress test — five-year impairment charge as a percentage of each book. "
+        f"Your firm (the gilt diamond) is placed on that year's peer cross-section "
+        f"using your provision coverage."
+    )
+    scale_note = (
+        "Note that each panel has its own scale — mortgage loss rates are an order "
+        "of magnitude smaller than unsecured retail. Peer values are as published; "
+        "only your firm's marker is modelled. Where too few firms published a "
+        "product that year, your firm's marker is omitted."
+    )
 
-st.markdown(
-    f"Predicted five-year impairment charge, as a percentage of each book, "
-    f"under your scenario (anchored to the Bank's **{scenario_year} stress test**). "
-    f"The gilt diamond is your firm."
-)
+predictions = predictions.rename(columns=_PRODUCT_LABELS)
+_ordered = [c for c in _PRODUCT_LABELS.values() if c in predictions.columns]
+predictions = predictions.loc[:, _ordered].dropna(axis=1, how="all")
+
 st.plotly_chart(
     benchmark_strip_figure(predictions.rename(index=_SHORT_FIRM_NAMES), highlight=YOUR_FIRM),
     width="stretch",
     config={"displayModeBar": False},
 )
-st.caption(
-    "Note that each panel has its own scale — mortgage loss rates are an order of "
-    "magnitude smaller than unsecured retail. Predictions can dip below zero "
-    "where the scenario sits outside the calibration range; read those as "
-    "'negligible', not as a forecast of write-backs."
-)
+st.caption(scale_note)
 
 with st.expander("Benchmark table"):
     st.dataframe(predictions.style.format("{:.2%}"), width="stretch")
@@ -406,6 +497,18 @@ corporate profits, Bank Rate) plus each firm's **pre-stress provision
 coverage** — one ordinary-least-squares model per product, with backward-AIC
 variable selection. Your benchmark is simply that model evaluated at your
 scenario and your coverage levels, with no firm-specific effects applied.
+
+Three calibrations sit behind the scenario picker. A **custom scenario** uses
+the cross-scenario model above, fitted either to every published test (the
+default) or, via the dropdown, to only the three most recent. Benchmarking
+against a **published stress test** works differently: within a single test
+every firm faces the same macro shocks, so those carry no cross-firm
+information — peers therefore show their actual published results, and your
+firm is placed by regressing that year's outcomes on provision coverage alone
+(a small cross-section: treat it as a peer positioning, not a forecast). The
+2014 test is not offered as a published benchmark because its five-year
+outcomes are imputed from the three-year figures. The model detail below is
+for the all-years reference calibration.
 
 The methodology is a Python port of an R analysis originally built for this
 purpose; the port reproduces the R coefficients to floating-point precision
@@ -462,8 +565,9 @@ v{__version__}.
         st.dataframe(shocks_df.style.format("{:.3f}"), width="stretch")
 
 st.markdown(
-    """<div class="footer">Peter McIntyre ·
-<a href="https://github.com/quietsnooze/Pm_benchmarking">GitHub</a> ·
+    f"""<div class="footer">Peter McIntyre ·
+<a href="{LINKEDIN_URL}">LinkedIn</a> ·
+<a href="{GITHUB_URL}">GitHub</a> ·
 Public BoE data · Not investment advice, not a regulatory model.</div>""",
     unsafe_allow_html=True,
 )

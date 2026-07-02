@@ -20,10 +20,12 @@ Public surface:
     RECIPES: dict[str, ProductRecipe]     ({"mortgage", "retail", "cre", "business"})
     fit_product_models(df, recipes=RECIPES) -> dict[str, RegressionResults]
     predict_for_scenario(models, shock_values, firms_df) -> pd.DataFrame
+    year_benchmark(modelling_df, year, coverage) -> pd.DataFrame
 """
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field
 
 import pandas as pd
@@ -251,3 +253,93 @@ def predict_for_scenario(
         scored = predict_with_model(scoring, model)
         out[product_name] = scored["prediction"].values
     return out.set_index("firm_name")
+
+
+def year_benchmark(
+    modelling_df: pd.DataFrame,
+    year: int,
+    coverage: dict[str, float],
+    *,
+    recipes: dict[str, ProductRecipe] = RECIPES,
+    your_firm: str = "Your firm",
+    min_obs: int = 3,
+) -> pd.DataFrame:
+    """Benchmark against one published stress test's actual results.
+
+    Within a single stress test every firm faces the same macro scenario,
+    so the scenario shocks carry no cross-firm information — the only
+    within-year variation the data offers is firm-level provision
+    coverage. This benchmark therefore shows peers' *actual published*
+    impairment outcomes untouched, and places ``your_firm`` on that
+    cross-section by regressing each product's outcome on its coverage
+    column (no stepwise, no firm effects) across the year's participants.
+
+    Parameters
+    ----------
+    modelling_df : pd.DataFrame
+        Output of :func:`build_modelling_dataset` (only ``firm_name``,
+        ``acsyear``, the target columns and the ``*_prov_coverage``
+        columns are used).
+    year : int
+        The published stress test to benchmark against. Must exist in
+        ``modelling_df['acsyear']``.
+    coverage : dict[str, float]
+        ``{coverage_column: value}`` for your firm, e.g.
+        ``{"mort_prov_coverage": 0.002, ...}``. Products whose coverage
+        column is missing from this dict get a NaN prediction.
+    recipes : dict[str, ProductRecipe]
+        Product definitions; each recipe's coverage predictor is the
+        ``*_prov_coverage`` entry of its ``independent_vars``, and its
+        ``exclude_firms`` are dropped from the fit (never from the
+        peer rows shown).
+    your_firm : str
+        Index label for the synthetic row appended to the output.
+    min_obs : int
+        Fewest usable (outcome, coverage) pairs required to fit a
+        product's cross-section; below it the prediction is NaN.
+
+    Returns
+    -------
+    pd.DataFrame
+        Indexed by ``firm_name`` (the year's participants plus
+        ``your_firm``), one column per recipe key. Peer cells are actual
+        published outcomes; the ``your_firm`` row is modelled. Cells are
+        NaN where a firm didn't publish that product or the fit was
+        infeasible.
+
+    Raises
+    ------
+    ValueError
+        If ``modelling_df`` has no rows for ``year``.
+    """
+    rows = modelling_df.loc[modelling_df["acsyear"] == year]
+    if rows.empty:
+        raise ValueError(f"no stress-test results for year {year}")
+
+    peers = rows.drop_duplicates("firm_name").set_index("firm_name")
+    out = pd.DataFrame(index=peers.index.append(pd.Index([your_firm], name="firm_name")))
+
+    for name, recipe in recipes.items():
+        target = recipe.dependent_var
+        out.loc[peers.index, name] = peers[target]
+
+        cov_col = next(v for v in recipe.independent_vars if v.endswith("_prov_coverage"))
+        fit_rows = rows
+        if recipe.exclude_firms:
+            excl = {f.lower() for f in recipe.exclude_firms}
+            fit_rows = fit_rows.loc[~fit_rows["firm_name"].str.lower().isin(excl)]
+        fit_rows = fit_rows.dropna(subset=[target, cov_col])
+
+        prediction = math.nan
+        if len(fit_rows) >= min_obs and cov_col in coverage:
+            model = fit_linear_model(
+                fit_rows,
+                dependent_var=target,
+                independent_vars=[cov_col],
+                stepwise=False,
+            )
+            scored = predict_with_model(pd.DataFrame({cov_col: [coverage[cov_col]]}), model)
+            prediction = float(scored["prediction"].iloc[0])
+        out.loc[your_firm, name] = prediction
+
+    return out
