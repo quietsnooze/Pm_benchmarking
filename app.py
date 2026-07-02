@@ -1,9 +1,12 @@
-"""Streamlit app — UK bank stress-test impairment-charge benchmarking.
+"""Streamlit app — benchmark stressed loan losses against the UK banks.
 
-Single-page app that loads the processed BoE ACS scenario data, fits the
-four product OLS models defined in :mod:`uk_stress_benchmark.pipeline`,
-and lets the user explore both the historical fits and a what-if
-scenario where they pick the shock magnitudes themselves.
+Single-page app: pick a Bank of England ACS scenario (or adjust its
+shocks), describe your own loan book with three provision-coverage
+numbers, and read off where a firm like yours would sit among the UK
+stress-test participants. The regression machinery that powers the
+benchmark lives in :mod:`uk_stress_benchmark.pipeline` and stays out of
+sight — a "How the benchmark is built" section at the foot of the page
+holds the full detail for readers who want it.
 
 The actual library logic (loaders, feature engineering, modelling) is
 exercised by the test suite — this file is the rendering / interaction
@@ -29,9 +32,26 @@ from uk_stress_benchmark.provisions import load_provisions
 from uk_stress_benchmark.results import load_results
 from uk_stress_benchmark.scenario_index import modelling_paths
 from uk_stress_benchmark.scenarios import build_low_point_shocks
-from uk_stress_benchmark.viz import actual_vs_expected_figure, predictions_heatmap
+from uk_stress_benchmark.viz import actual_vs_expected_figure, benchmark_strip_figure
 
 PROCESSED = Path(__file__).resolve().parent / "processed_inputs"
+
+YOUR_FIRM = "Your firm"
+
+# Display names for the four modelled products, in reading order.
+_PRODUCT_LABELS: dict[str, str] = {
+    "mortgage": "Mortgages",
+    "retail": "Retail unsecured",
+    "cre": "Commercial real estate",
+    "business": "Business lending",
+}
+
+# Short trading names for chart axes — the full legal names stay in the
+# prose and tables.
+_SHORT_FIRM_NAMES: dict[str, str] = {
+    "Lloyds Banking Group": "Lloyds",
+    "The Royal Bank of Scotland Group": "RBS",
+}
 
 # Canonical 7-variable feature set fed to build_low_point_shocks. Same
 # list the gold regression test pins.
@@ -45,25 +65,132 @@ _CANONICAL_VARS: list[str] = [
     "UK Bank Rate",
 ]
 
-# What-if slider definitions. Each: (column-name, label, min, max, step).
-# Bank-rate ranges are wide because the rate itself is small — even
-# modest absolute moves come out as huge percentage changes.
-_SHOCK_SLIDERS: list[tuple[str, str, float, float, float]] = [
-    ("uk_residential_property_price_index_pct_fall", "UK house price fall", -0.50, 0.00, 0.01),
+# What-if slider definitions. Each: (column-name, label, min, max, step,
+# as_pct). Percent sliders display whole percent points (the model wants
+# fractions, converted on read). Bank-rate moves stay as multiples of the
+# rate itself — the rate is small, so even modest absolute moves come out
+# as huge percentage changes.
+_SHOCK_SLIDERS: list[tuple[str, str, float, float, float, bool]] = [
+    ("uk_residential_property_price_index_pct_fall", "House price fall", -50.0, 0.0, 1.0, True),
     (
         "uk_commercial_real_estate_price_index_aggregate_pct_fall",
-        "UK CRE price fall",
-        -0.60,
-        0.00,
-        0.01,
+        "Commercial real estate price fall",
+        -60.0,
+        0.0,
+        1.0,
+        True,
     ),
-    ("uk_unemployment_rate_pct_rise", "UK unemployment rise", 0.00, 2.00, 0.05),
-    ("uk_unemployment_rate_pct_fall", "UK unemployment fall", -0.20, 0.00, 0.01),
-    ("uk_nominal_gdp_index_pct_fall", "UK nominal GDP fall", -0.15, 0.05, 0.005),
-    ("uk_corporate_profits_pct_fall", "UK corporate profits fall", -0.30, 0.00, 0.01),
-    ("uk_bank_rate_pct_rise", "Bank Rate rise (multiple)", 0.0, 20.0, 0.5),
-    ("uk_bank_rate_pct_fall", "Bank Rate fall (multiple)", -1.0, 0.0, 0.05),
+    ("uk_unemployment_rate_pct_rise", "Unemployment rate rise", 0.0, 200.0, 5.0, True),
+    ("uk_unemployment_rate_pct_fall", "Unemployment rate fall", -20.0, 0.0, 1.0, True),
+    ("uk_nominal_gdp_index_pct_fall", "Nominal GDP fall", -15.0, 5.0, 0.5, True),
+    ("uk_corporate_profits_pct_fall", "Corporate profits fall", -30.0, 0.0, 1.0, True),
+    ("uk_bank_rate_pct_rise", "Bank Rate rise (multiple)", 0.0, 20.0, 0.5, False),
+    ("uk_bank_rate_pct_fall", "Bank Rate fall (multiple)", -1.0, 0.0, 0.05, False),
 ]
+
+# The three firm-level inputs the benchmark needs: (coverage column,
+# label, help text). Values are entered as % of book.
+_COVERAGE_INPUTS: list[tuple[str, str, str]] = [
+    (
+        "mort_prov_coverage",
+        "Mortgage provisions (% of book)",
+        "Balance-sheet provisions held against the mortgage book, before stress.",
+    ),
+    (
+        "retail_prov_coverage",
+        "Retail unsecured provisions (% of book)",
+        "Provisions held against credit cards and other unsecured retail lending.",
+    ),
+    (
+        "commercial_prov_coverage",
+        "Commercial provisions (% of book)",
+        "Provisions held against commercial real estate and business lending.",
+    ),
+]
+
+# Headline shocks shown as chips next to the scenario picker.
+_CHIP_SHOCKS: list[tuple[str, str]] = [
+    ("uk_residential_property_price_index_pct_fall", "House prices"),
+    ("uk_commercial_real_estate_price_index_aggregate_pct_fall", "CRE prices"),
+    ("uk_unemployment_rate_pct_rise", "Unemployment rate"),
+    ("uk_nominal_gdp_index_pct_fall", "Nominal GDP"),
+]
+
+# ------------------------------ theming ------------------------------------
+
+# Colour / type tokens mirrored in .streamlit/config.toml and viz.py.
+# Gilt (#8F6B1E) is reserved for "your firm" — it appears in the chart
+# marker and nowhere else, so gilt always means "you".
+_CSS = """
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Spectral:wght@500;600&family=IBM+Plex+Mono:wght@400;500&family=Source+Sans+3:ital,wght@0,400;0,600;1,400&display=swap');
+
+.block-container { max-width: 1100px; padding-top: 3rem; }
+
+h1, h2, h3 {
+    font-family: 'Spectral', Georgia, serif !important;
+    font-weight: 500 !important;
+    letter-spacing: -0.01em;
+    color: #1C2A33;
+}
+h1 { font-size: 2.7rem !important; line-height: 1.12 !important; }
+
+.eyebrow {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.72rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: #0E5E67;
+    margin: 0 0 0.35rem 0;
+}
+.lede {
+    font-size: 1.13rem;
+    line-height: 1.55;
+    color: #3D4A52;
+    max-width: 46rem;
+    margin: 0.4rem 0 0.2rem 0;
+}
+.byline { font-size: 0.88rem; color: #5C5648; margin-top: 0.9rem; }
+.byline a { color: #0E5E67; text-decoration: none; border-bottom: 1px solid #CFCCC0; }
+
+h2.step { margin-top: 2.6rem; }
+h2.step .num {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 1.05rem;
+    color: #0E5E67;
+    margin-right: 0.75rem;
+}
+
+.chips { display: flex; gap: 0.5rem; flex-wrap: wrap; margin: 0.3rem 0 0.6rem 0; }
+.chip {
+    background: #F0EEE7;
+    border: 1px solid #E2DFD4;
+    border-radius: 6px;
+    padding: 0.32rem 0.62rem;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.8rem;
+    color: #1C2A33;
+    white-space: nowrap;
+}
+.chip .lbl { color: #5C5648; margin-right: 0.45rem; font-family: 'Source Sans 3', sans-serif; }
+
+.footer {
+    margin-top: 3.5rem;
+    padding-top: 1.1rem;
+    border-top: 1px solid #E2DFD4;
+    font-size: 0.85rem;
+    color: #5C5648;
+}
+.footer a { color: #0E5E67; text-decoration: none; border-bottom: 1px solid #CFCCC0; }
+</style>
+"""
+
+
+def _step_header(number: int, title: str) -> None:
+    st.markdown(
+        f'<h2 class="step"><span class="num">{number}</span>{title}</h2>',
+        unsafe_allow_html=True,
+    )
 
 
 # ----------------------------- data plumbing -------------------------------
@@ -86,7 +213,7 @@ def _load_shocks() -> pd.DataFrame:
     )
 
 
-@st.cache_resource(show_spinner="Fitting product models…")
+@st.cache_resource(show_spinner="Calibrating the benchmark…")
 def _fit_everything() -> tuple[pd.DataFrame, dict]:
     results, provisions = _load_firm_data()
     shocks = _load_shocks()
@@ -101,84 +228,215 @@ def _per_product_dataset(modelling_df: pd.DataFrame, product: str) -> pd.DataFra
     if not recipe.exclude_firms:
         return modelling_df
     excl = {f.lower() for f in recipe.exclude_firms}
-    return modelling_df[~modelling_df["firm_name"].str.lower().isin(excl)]
+    mask = ~modelling_df["firm_name"].str.lower().isin(excl)
+    return modelling_df.loc[mask]
+
+
+def _with_your_firm(firms_df: pd.DataFrame, coverage: dict[str, float]) -> pd.DataFrame:
+    """Append a synthetic "your firm" row: user coverages, no firm dummies."""
+    row: dict[str, object] = {c: 0.0 for c in firms_df.columns if c.startswith("firm_name_")}
+    row["firm_name"] = YOUR_FIRM
+    row.update(coverage)
+    return pd.concat([firms_df, pd.DataFrame([row])], ignore_index=True)
 
 
 # --------------------------------- page ------------------------------------
 
 st.set_page_config(
-    page_title="UK stress test benchmarking",
+    page_title="UK stress-loss benchmark",
+    page_icon="🏛️",
     layout="wide",
     initial_sidebar_state="collapsed",
 )
-
-st.title("UK stress test benchmarking")
-st.caption(f"v{__version__}  ·  Bank of England ACS 2014–2019")
-
-st.markdown(
-    """
-This app benchmarks UK banking-system impairment-charge outcomes against the
-Bank of England's annual cyclical scenario (ACS) stress tests from 2014 to 2019.
-For each lending product (mortgages, retail unsecured, commercial real estate,
-business lending) it fits an OLS regression of the firm-level 5-year impairment-
-charge percentage on the worst-point shocks observed in each scenario's
-projection horizon, plus firm-specific provision-coverage levels.
-
-The fitted models are then used to predict per-firm impairment under a
-hypothetical scenario you set via the sliders in the **What-if explorer** below.
-Every coefficient, R², and prediction is reproducible from the underlying
-public BoE data — see the [GitHub repo](https://github.com/quietsnooze/Pm_benchmarking)
-for the methodology and tests (current parity with the legacy R port is
-exact to floating-point precision against a 2019-vintage gold reference).
-"""
-)
+st.markdown(_CSS, unsafe_allow_html=True)
 
 modelling_df, fitted_models = _fit_everything()
 shocks_df = _load_shocks()
+acs_years = sorted(modelling_paths(PROCESSED))
+peer_firms = sorted(modelling_df["firm_name"].unique())
+_acsyears = pd.Series(modelling_df["acsyear"])
+year_lo, year_hi = int(_acsyears.min()), int(_acsyears.max())
 
-# --- Section 1: Data overview ----------------------------------------------
+# --- Hero -------------------------------------------------------------------
 
-st.header("Data")
-
-c1, c2, c3, c4 = st.columns(4)
-c1.metric("Firms", modelling_df["firm_name"].nunique())
-c2.metric(
-    "ACS years",
-    f"{int(modelling_df['acsyear'].min())}–{int(modelling_df['acsyear'].max())}",
+st.markdown(
+    f'<p class="eyebrow">UK bank stress testing · Bank of England scenarios '
+    f"{year_lo}–{year_hi}</p>",
+    unsafe_allow_html=True,
 )
-c3.metric("Observations", len(modelling_df))
-c4.metric("Products modelled", len(fitted_models))
+st.markdown("# Benchmark your stressed losses against the UK banks")
+st.markdown(
+    f"""<p class="lede">Set a stress scenario, describe your loan book in three
+numbers, and see the five-year impairment charge a firm like yours would report
+next to {", ".join(peer_firms[:-1])} and {peer_firms[-1]} — calibrated on every
+firm-level result the Bank of England has published for its concurrent stress
+tests, {year_lo} to {year_hi}.</p>
+<p class="byline">Built by Peter McIntyre ·
+<a href="https://github.com/quietsnooze/Pm_benchmarking">Source &amp; methodology
+on GitHub</a></p>""",
+    unsafe_allow_html=True,
+)
 
-with st.expander("Modelling dataset", expanded=False):
-    st.dataframe(
-        modelling_df.drop(columns=[c for c in modelling_df.columns if c.startswith("firm_name_")]),
-        width="stretch",
+# --- Step 1: scenario ---------------------------------------------------------
+
+_step_header(1, "Set the scenario")
+
+pick_col, chips_col = st.columns([1, 2], vertical_alignment="bottom")
+with pick_col:
+    scenario_year = st.selectbox(
+        "Start from a published stress test",
+        options=acs_years,
+        index=len(acs_years) - 1,
+        format_func=lambda y: f"{y} Bank of England scenario",
     )
 
-with st.expander("Low-point shock features by ACS year", expanded=False):
-    st.dataframe(shocks_df.style.format("{:.3f}"), width="stretch")
+# Reset the shock sliders whenever the starting scenario changes, so the
+# sliders always re-anchor to the picked year's observed shocks.
+if st.session_state.get("_scenario_year") != scenario_year:
+    st.session_state["_scenario_year"] = scenario_year
+    for _slider_col, *_ in _SHOCK_SLIDERS:
+        st.session_state.pop(_slider_col, None)
 
+defaults_row = shocks_df.loc[scenario_year]
 
-# --- Section 2: Fitted models ----------------------------------------------
+with chips_col:
+    chips = "".join(
+        f'<span class="chip"><span class="lbl">{label}</span>{defaults_row[col]:+.0%}</span>'
+        for col, label in _CHIP_SHOCKS
+        if col in defaults_row.index and pd.notna(defaults_row[col])
+    )
+    st.markdown(f'<div class="chips">{chips}</div>', unsafe_allow_html=True)
 
-st.header("Fitted models")
+with st.expander("Adjust the shocks"):
+    st.caption(
+        "Each shock is the worst point of the scenario's five-year path, as a "
+        "change from the starting level. Bank Rate moves are multiples of the "
+        "rate itself — a 5× rise of a 0.5% rate takes it to 3%."
+    )
+    slider_cols = st.columns(2)
+    shock_values: dict[str, float] = {}
+    for i, (col, label, lo, hi, step, as_pct) in enumerate(_SHOCK_SLIDERS):
+        with slider_cols[i % 2]:
+            default_val = float(defaults_row.get(col, 0.0)) if col in defaults_row.index else 0.0
+            if as_pct:
+                default_val *= 100
+            # Clip default into the slider's range so it never throws.
+            default_val = max(lo, min(hi, default_val))
+            if as_pct:
+                fmt = "%.1f%%" if step < 1 else "%.0f%%"
+            else:
+                fmt = "×%.2f" if step < 0.5 else "×%.1f"
+            shown = st.slider(
+                label,
+                min_value=lo,
+                max_value=hi,
+                value=default_val,
+                step=step,
+                format=fmt,
+                key=col,
+            )
+            shock_values[col] = shown / 100 if as_pct else shown
 
-product_tabs = st.tabs([p.title() for p in fitted_models])
-for tab, (product, model) in zip(product_tabs, fitted_models.items(), strict=True):
-    with tab:
-        recipe = RECIPES[product]
-        c1, c2 = st.columns(2)
-        c1.metric("R²", f"{model.rsquared:.3f}")
-        c2.metric("Observations", int(model.nobs))
+# --- Step 2: your firm --------------------------------------------------------
 
-        product_df = _per_product_dataset(modelling_df, product)
-        scored = predict_with_model(product_df, model, actual_col=recipe.dependent_var)
-        fig = actual_vs_expected_figure(
-            scored, title=f"{product.title()} — actual vs. predicted impairment %"
+_step_header(2, "Describe your firm")
+st.caption(
+    "Provision coverage — provisions already held, as a share of each book — "
+    "is the only firm-specific input the benchmark needs. Defaults are the "
+    "peer medians."
+)
+
+firms_df = modelling_df.drop_duplicates("firm_name").reset_index(drop=True)
+coverage_inputs: dict[str, float] = {}
+coverage_cols = st.columns(3)
+for (cov_col, label, help_text), ui_col in zip(_COVERAGE_INPUTS, coverage_cols, strict=True):
+    peer_median_pct = float(pd.Series(firms_df[cov_col]).median()) * 100
+    with ui_col:
+        entered = st.number_input(
+            label,
+            min_value=0.0,
+            max_value=25.0,
+            value=round(peer_median_pct, 2),
+            step=0.05,
+            format="%.2f",
+            help=help_text,
         )
-        st.plotly_chart(fig, width="stretch")
+    coverage_inputs[cov_col] = entered / 100
 
-        with st.expander("Coefficient table", expanded=False):
+# --- Step 3: the benchmark ----------------------------------------------------
+
+_step_header(3, "Read the benchmark")
+
+scoring_df = _with_your_firm(firms_df, coverage_inputs)
+predictions = predict_for_scenario(fitted_models, shock_values, scoring_df)
+predictions = predictions.rename(columns=_PRODUCT_LABELS).loc[:, list(_PRODUCT_LABELS.values())]
+
+st.markdown(
+    f"Predicted five-year impairment charge, as a percentage of each book, "
+    f"under your scenario (anchored to the Bank's **{scenario_year} stress test**). "
+    f"The gilt diamond is your firm."
+)
+st.plotly_chart(
+    benchmark_strip_figure(predictions.rename(index=_SHORT_FIRM_NAMES), highlight=YOUR_FIRM),
+    width="stretch",
+    config={"displayModeBar": False},
+)
+st.caption(
+    "Note that each panel has its own scale — mortgage loss rates are an order of "
+    "magnitude smaller than unsecured retail. Predictions can dip below zero "
+    "where the scenario sits outside the calibration range; read those as "
+    "'negligible', not as a forecast of write-backs."
+)
+
+with st.expander("Benchmark table"):
+    st.dataframe(predictions.style.format("{:.2%}"), width="stretch")
+
+# --- Methodology (the quiet part) ----------------------------------------------
+
+st.markdown("---")
+
+with st.expander("How the benchmark is built"):
+    st.markdown(
+        f"""
+Every published Bank of England concurrent stress test ({year_lo}–{year_hi})
+reports, for each participating firm, the five-year impairment charge on each
+major UK lending book. This app regresses those outcomes on the **worst point of each
+scenario's macro paths** (house prices, CRE prices, unemployment, GDP,
+corporate profits, Bank Rate) plus each firm's **pre-stress provision
+coverage** — one ordinary-least-squares model per product, with backward-AIC
+variable selection. Your benchmark is simply that model evaluated at your
+scenario and your coverage levels, with no firm-specific effects applied.
+
+The methodology is a Python port of an R analysis originally built for this
+purpose; the port reproduces the R coefficients to floating-point precision
+against a 2019-vintage gold reference. Data, code and tests are on
+[GitHub](https://github.com/quietsnooze/Pm_benchmarking). App version
+v{__version__}.
+"""
+    )
+
+    fit_summary = pd.DataFrame(
+        {
+            "Product": [_PRODUCT_LABELS[p] for p in fitted_models],
+            "R²": [f"{m.rsquared:.3f}" for m in fitted_models.values()],
+            "Observations": [int(m.nobs) for m in fitted_models.values()],
+        }
+    ).set_index("Product")
+    st.table(fit_summary)
+
+    product_tabs = st.tabs([_PRODUCT_LABELS[p] for p in fitted_models])
+    for tab, (product, model) in zip(product_tabs, fitted_models.items(), strict=True):
+        with tab:
+            recipe = RECIPES[product]
+            product_df = _per_product_dataset(modelling_df, product)
+            scored = predict_with_model(product_df, model, actual_col=recipe.dependent_var)
+            scored = scored.assign(firm_name=scored["firm_name"].replace(_SHORT_FIRM_NAMES))
+            fig = actual_vs_expected_figure(
+                scored,
+                title=f"{_PRODUCT_LABELS[product]} — actual vs. predicted impairment",
+            )
+            st.plotly_chart(fig, width="stretch", config={"displayModeBar": False})
+
             params = pd.DataFrame(
                 {
                     "coefficient": model.params,
@@ -189,54 +447,23 @@ for tab, (product, model) in zip(product_tabs, fitted_models.items(), strict=Tru
             )
             st.dataframe(params.style.format("{:.4f}"), width="stretch")
 
-        with st.expander("statsmodels summary", expanded=False):
-            st.text(str(model.summary()))
+            with st.expander("Full statsmodels summary"):
+                st.text(str(model.summary()))
 
-
-# --- Section 3: What-if explorer -------------------------------------------
-
-st.header("What-if explorer")
-st.write(
-    "Pick a starting ACS year (sliders default to its observed shock values) "
-    "and adjust the shocks to see predicted impairment charges per firm and "
-    "per product. Bank Rate moves are expressed as a percentage change of "
-    "the rate itself (so a 5x rise of a 0.5% rate means the rate goes to 3%)."
-)
-
-default_year = st.selectbox(
-    "Start from ACS year",
-    options=sorted(modelling_paths(PROCESSED)),
-    index=3,  # 2017 default
-)
-defaults_row = shocks_df.loc[default_year]
-
-slider_cols = st.columns(2)
-shock_values: dict[str, float] = {}
-for i, (col, label, lo, hi, step) in enumerate(_SHOCK_SLIDERS):
-    with slider_cols[i % 2]:
-        default_val = float(defaults_row.get(col, 0.0)) if col in defaults_row.index else 0.0
-        # Clip default into the slider's range so it never throws.
-        default_val = max(lo, min(hi, default_val))
-        shock_values[col] = st.slider(
-            label, min_value=lo, max_value=hi, value=default_val, step=step, key=col
+    with st.expander("Underlying data"):
+        st.markdown("**Modelling dataset** — one row per firm × ACS year.")
+        st.dataframe(
+            modelling_df.drop(
+                columns=[c for c in modelling_df.columns if c.startswith("firm_name_")]
+            ),
+            width="stretch",
         )
+        st.markdown("**Low-point shocks** — the scenario features, by ACS year.")
+        st.dataframe(shocks_df.style.format("{:.3f}"), width="stretch")
 
-firms_df = modelling_df.drop_duplicates("firm_name").reset_index(drop=True)
-predictions = predict_for_scenario(fitted_models, shock_values, firms_df)
-
-st.subheader(f"Predicted 5-year impairment charges (% of book), starting from {default_year}")
-st.plotly_chart(
-    predictions_heatmap(
-        predictions,
-        title=f"Predicted impairment charges per firm × product (vs. {default_year} ACS)",
-    ),
-    width="stretch",
-)
-
-with st.expander("Predictions (table)", expanded=False):
-    st.dataframe(predictions.style.format("{:.2%}"), width="stretch")
-
-st.caption(
-    "Predictions can dip below zero where the OLS extrapolates beyond the calibration "
-    "data — those are model artefacts, not viable forecasts."
+st.markdown(
+    """<div class="footer">Peter McIntyre ·
+<a href="https://github.com/quietsnooze/Pm_benchmarking">GitHub</a> ·
+Public BoE data · Not investment advice, not a regulatory model.</div>""",
+    unsafe_allow_html=True,
 )

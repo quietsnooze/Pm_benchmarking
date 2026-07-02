@@ -1,5 +1,7 @@
-# Portfolio-friendly defaults applied at deploy time.
-# - Light theme with a banking-blue primary accent for chart highlights / buttons.
+# Theme: "BoE institutional" — paper-white surface, ink text, teal
+# interactive accent. Colour tokens are mirrored in
+# src/uk_stress_benchmark/viz.py (charts) and the CSS block in app.py;
+# change them together.
 # - toolbarMode = "viewer" hides the developer hamburger menu (Settings,
 #   Get help, Report a bug) from visitors — Pete still sees the full toolbar
 #   when logged in as the app owner.
@@ -7,7 +9,11 @@
 
 [theme]
 base = "light"
-primaryColor = "#1E40AF"
+primaryColor = "#0E5E67"
+backgroundColor = "#FAFAF7"
+secondaryBackgroundColor = "#F0EEE7"
+textColor = "#1C2A33"
+linkColor = "#0E5E67"
 
 [client]
 toolbarMode = "viewer"
