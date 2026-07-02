@@ -13,6 +13,7 @@ from uk_stress_benchmark.pipeline import (
     build_modelling_dataset,
     fit_product_models,
     predict_for_scenario,
+    year_benchmark,
 )
 from uk_stress_benchmark.provisions import load_provisions
 from uk_stress_benchmark.results import load_results
@@ -258,3 +259,76 @@ def test_real_fitted_models_have_sensible_coefficient_signs(
                 assert value <= 1e-9, f"{product}.{predictor} = {value}"
             elif expected == "non-negative":
                 assert value >= -1e-9, f"{product}.{predictor} = {value}"
+
+
+# ------------------------------ year benchmark ------------------------------
+
+
+def _toy_year_benchmark_df() -> pd.DataFrame:
+    # One published year (2022) plus a decoy year that must be ignored.
+    # Mortgage / CRE / business outcomes are exactly linear in the
+    # relevant coverage column so the cross-sectional fit is exact:
+    #   mortgage: y = 0.006 + 2 * mort_prov_coverage
+    #   cre:      y = 0.010 + 2 * commercial_prov_coverage  (excl. Nationwide)
+    #   business: y = 0.000 + 2 * commercial_prov_coverage
+    # Retail has only two observations -> below the min_obs floor.
+    # Nationwide's CRE actual is a wild outlier: the per-recipe exclude
+    # must keep it out of the fit while it still shows as a peer actual.
+    df_2022 = pd.DataFrame(
+        {
+            "firm_name": ["Barclays", "HSBC", "Lloyds Banking Group", "Nationwide"],
+            "acsyear": [2022] * 4,
+            "uk_mort_5yr_ic_pct": [0.010, 0.014, 0.018, 0.022],
+            "uk_retail_5yr_ic_pct": [0.05, 0.06, None, None],
+            "uk_cre_5yr_ic_pct": [0.030, 0.040, 0.050, 0.999],
+            "uk_bus_5yr_ic_pct": [0.020, 0.030, 0.040, 0.050],
+            "mort_prov_coverage": [0.002, 0.004, 0.006, 0.008],
+            "retail_prov_coverage": [0.02, 0.04, 0.06, 0.08],
+            "commercial_prov_coverage": [0.010, 0.015, 0.020, 0.025],
+        }
+    )
+    decoy_2019 = df_2022.assign(acsyear=2019, uk_mort_5yr_ic_pct=[9.0, 9.0, 9.0, 9.0])
+    return pd.concat([df_2022, decoy_2019], ignore_index=True)
+
+
+_TOY_COVERAGE = {
+    "mort_prov_coverage": 0.005,
+    "retail_prov_coverage": 0.05,
+    "commercial_prov_coverage": 0.0175,
+}
+
+
+def test_year_benchmark_peers_show_actual_published_results():
+    out = year_benchmark(_toy_year_benchmark_df(), 2022, _TOY_COVERAGE)
+    assert out.loc["Barclays", "mortgage"] == pytest.approx(0.010)
+    assert out.loc["Nationwide", "mortgage"] == pytest.approx(0.022)
+    # The outlier CRE actual is still displayed for Nationwide.
+    assert out.loc["Nationwide", "cre"] == pytest.approx(0.999)
+    # The decoy year's values must not leak in.
+    assert out.loc["Barclays", "mortgage"] != pytest.approx(9.0)
+
+
+def test_year_benchmark_predicts_your_firm_from_the_year_cross_section():
+    out = year_benchmark(_toy_year_benchmark_df(), 2022, _TOY_COVERAGE)
+    # Exact linear relations -> exact predictions.
+    assert out.loc["Your firm", "mortgage"] == pytest.approx(0.006 + 2 * 0.005)
+    assert out.loc["Your firm", "business"] == pytest.approx(2 * 0.0175)
+
+
+def test_year_benchmark_applies_per_recipe_firm_excludes_to_the_fit():
+    # Nationwide's outlier would wreck the exact CRE line if included.
+    out = year_benchmark(_toy_year_benchmark_df(), 2022, _TOY_COVERAGE)
+    assert out.loc["Your firm", "cre"] == pytest.approx(0.010 + 2 * 0.0175)
+
+
+def test_year_benchmark_returns_nan_when_too_few_observations():
+    out = year_benchmark(_toy_year_benchmark_df(), 2022, _TOY_COVERAGE)
+    # Retail has two usable rows, below the default floor of three.
+    assert pd.isna(out.loc["Your firm", "retail"])
+    # Peer actuals for retail still show where published.
+    assert out.loc["Barclays", "retail"] == pytest.approx(0.05)
+
+
+def test_year_benchmark_raises_for_a_year_with_no_results():
+    with pytest.raises(ValueError, match="1999"):
+        year_benchmark(_toy_year_benchmark_df(), 1999, _TOY_COVERAGE)
