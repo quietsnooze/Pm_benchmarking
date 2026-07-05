@@ -7,6 +7,7 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
+from uk_stress_benchmark.models import fit_linear_model
 from uk_stress_benchmark.pipeline import (
     RECIPES,
     ProductRecipe,
@@ -15,7 +16,7 @@ from uk_stress_benchmark.pipeline import (
     predict_for_scenario,
     year_benchmark,
 )
-from uk_stress_benchmark.provisions import load_provisions
+from uk_stress_benchmark.provisions import load_btl, load_provisions
 from uk_stress_benchmark.results import load_results
 from uk_stress_benchmark.scenario_index import modelling_paths
 from uk_stress_benchmark.scenarios import build_low_point_shocks
@@ -94,6 +95,58 @@ def test_build_modelling_dataset_excludes_are_case_insensitive():
     assert "HSBC" in firms
 
 
+def _toy_btl() -> pd.DataFrame:
+    return pd.DataFrame(
+        {
+            "firm_name": ["Barclays", "HSBC", "Nationwide"],
+            "btl_share": [0.10, 0.02, 0.15],
+        }
+    )
+
+
+def test_build_modelling_dataset_broadcasts_btl_share_across_a_firms_years():
+    # BTL share is a static per-firm attribute: the same figure attaches to
+    # every one of a firm's rows, regardless of stress-test year.
+    df = build_modelling_dataset(_toy_results(), _toy_shocks(), _toy_provisions(), btl=_toy_btl())
+    assert "btl_share" in df.columns
+    barclays = df.loc[df["firm_name"] == "Barclays"]
+    assert len(barclays) == 2  # 2017 and 2018
+    assert barclays["btl_share"].tolist() == pytest.approx([0.10, 0.10])
+
+
+def test_build_modelling_dataset_left_joins_btl_so_a_missing_firm_is_kept():
+    # A firm absent from the BTL file keeps its rows (with NaN btl_share) —
+    # only the mortgage fit, which uses the column, drops that firm-year;
+    # the other products are unaffected.
+    btl_missing_hsbc = _toy_btl().loc[lambda d: d["firm_name"] != "HSBC"]
+    df = build_modelling_dataset(
+        _toy_results(), _toy_shocks(), _toy_provisions(), btl=btl_missing_hsbc
+    )
+    hsbc = df.loc[df["firm_name"] == "HSBC"]
+    assert not hsbc.empty
+    assert bool(hsbc["btl_share"].isna().all())
+
+
+def test_build_modelling_dataset_materialises_btl_column_even_without_data():
+    # With no BTL frame the column still exists (all NaN) so the mortgage
+    # recipe can reference it unconditionally.
+    df = build_modelling_dataset(_toy_results(), _toy_shocks(), _toy_provisions())
+    assert "btl_share" in df.columns
+    assert bool(df["btl_share"].isna().all())
+
+
+def test_mortgage_recipe_includes_btl_share():
+    assert "btl_share" in RECIPES["mortgage"].independent_vars
+
+
+def test_recipes_carry_no_firm_name_predictors():
+    # Firm identity must not drive any published model — no firm should be
+    # rated riskier than peers on the strength of its name alone.
+    for name, recipe in RECIPES.items():
+        offenders = [v for v in recipe.independent_vars if v.startswith("firm_name")]
+        assert offenders == [], f"{name} still keys off firm identity: {offenders}"
+
+
 def test_build_modelling_dataset_adds_firm_name_dummies():
     df = build_modelling_dataset(_toy_results(), _toy_shocks(), _toy_provisions())
     # Original firm_name column preserved; one-hot columns added with
@@ -147,7 +200,8 @@ def real_modelling_df() -> pd.DataFrame:
     )
     results = load_results(PROCESSED / "firm_results.csv")
     provisions = load_provisions(PROCESSED / "firm_provisions.csv")
-    return build_modelling_dataset(results, shocks, provisions)
+    btl = load_btl(PROCESSED / "firm_btl.csv")
+    return build_modelling_dataset(results, shocks, provisions, btl=btl)
 
 
 def test_real_modelling_dataset_has_expected_firms_and_acsyears(
@@ -259,6 +313,34 @@ def test_real_fitted_models_have_sensible_coefficient_signs(
                 assert value <= 1e-9, f"{product}.{predictor} = {value}"
             elif expected == "non-negative":
                 assert value >= -1e-9, f"{product}.{predictor} = {value}"
+
+
+def test_predict_for_scenario_uses_each_firms_own_btl_share():
+    # BTL share is a per-firm attribute carried on firms_df (not a scenario
+    # scalar), so a mortgage model that keeps it must give a higher charge
+    # to the higher-BTL firm, all else equal.
+    firms = pd.DataFrame(
+        {
+            "firm_name": ["LowBTL", "HighBTL"],
+            "mort_prov_coverage": [0.003, 0.003],
+            "btl_share": [0.02, 0.20],
+        }
+    )
+    train = pd.DataFrame(
+        {
+            "btl_share": [0.02, 0.20, 0.02, 0.20, 0.02, 0.20],
+            "mort_prov_coverage": [0.002, 0.002, 0.003, 0.003, 0.004, 0.004],
+            "uk_mort_5yr_ic_pct": [0.010, 0.030, 0.012, 0.032, 0.014, 0.034],
+        }
+    )
+    model = fit_linear_model(
+        train,
+        dependent_var="uk_mort_5yr_ic_pct",
+        independent_vars=["btl_share", "mort_prov_coverage"],
+        stepwise=False,
+    )
+    out = predict_for_scenario({"mortgage": model}, {}, firms)
+    assert out.loc["HighBTL", "mortgage"] > out.loc["LowBTL", "mortgage"]
 
 
 # ------------------------------ year benchmark ------------------------------

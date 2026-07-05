@@ -13,7 +13,7 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from uk_stress_benchmark.provisions import load_provisions
+from uk_stress_benchmark.provisions import load_btl, load_provisions
 from uk_stress_benchmark.results import load_results
 from uk_stress_benchmark.scenario_index import modelling_paths
 
@@ -95,3 +95,21 @@ def test_real_provisions_firms_are_a_subset_of_results_firms(
     results_firms = set(real_results["firm_name"].unique())
     # Should not raise:
     load_provisions(PROCESSED / "firm_provisions.csv", valid_firms=results_firms)
+
+
+def test_real_btl_firms_are_a_subset_of_results_firms(real_results: pd.DataFrame):
+    # Same firm-naming-drift guard for the hand-authored BTL file: every firm
+    # it names must exist in firm_results, and each of the modelled UK banks
+    # must carry a buy-to-let share (Standard Chartered is exempt — no UK
+    # mortgage book, excluded from modelling).
+    results_firms = set(real_results["firm_name"].unique())
+    btl = load_btl(PROCESSED / "firm_btl.csv", valid_firms=results_firms)
+    covered = set(btl.loc[btl["btl_share"].notna(), "firm_name"])
+    assert {
+        "Barclays",
+        "HSBC",
+        "Lloyds Banking Group",
+        "Nationwide",
+        "Santander UK",
+        "The Royal Bank of Scotland Group",
+    }.issubset(covered)

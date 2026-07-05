@@ -1,11 +1,11 @@
-"""Tests for load_provisions — verifies behaviour through the public surface."""
+"""Tests for load_provisions / load_btl — verified through the public surface."""
 
 from pathlib import Path
 
 import pandas as pd
 import pytest
 
-from uk_stress_benchmark.provisions import load_provisions
+from uk_stress_benchmark.provisions import load_btl, load_provisions
 
 
 def _write_csv(path: Path, rows: list[dict]) -> Path:
@@ -102,3 +102,37 @@ def test_no_validation_error_when_all_firms_known(tmp_path: Path):
     # Should not raise.
     df = load_provisions(csv, valid_firms={"Barclays", "HSBC"})
     assert len(df) == 1
+
+
+def test_load_btl_returns_canonical_columns_and_preserves_nan(tmp_path: Path):
+    csv = _write_csv(
+        tmp_path / "firm_btl.csv",
+        [
+            {"firm_name": "Nationwide", "btl_share": 0.15},
+            {"firm_name": "Standard Chartered", "btl_share": ""},
+        ],
+    )
+
+    df = load_btl(csv)
+
+    assert list(df.columns) == ["firm_name", "btl_share"]
+    assert df.set_index("firm_name").loc["Nationwide", "btl_share"] == pytest.approx(0.15)
+    assert pd.isna(df.set_index("firm_name").loc["Standard Chartered", "btl_share"])
+
+
+def test_load_btl_raises_when_required_column_missing(tmp_path: Path):
+    csv = _write_csv(tmp_path / "firm_btl.csv", [{"firm_name": "Nationwide"}])
+    with pytest.raises(ValueError, match="btl_share"):
+        load_btl(csv)
+
+
+def test_load_btl_validates_firms_against_known_set(tmp_path: Path):
+    csv = _write_csv(
+        tmp_path / "firm_btl.csv",
+        [
+            {"firm_name": "Nationwide", "btl_share": 0.15},
+            {"firm_name": "MysteryBank", "btl_share": 0.05},
+        ],
+    )
+    with pytest.raises(ValueError, match="MysteryBank"):
+        load_btl(csv, valid_firms={"Nationwide"})

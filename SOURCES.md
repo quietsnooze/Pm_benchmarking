@@ -99,6 +99,35 @@ These files have no public URL — they're hand-compiled summaries Pete put toge
 | --- | --- | --- | --- |
 | `old_version/stress test benchmarks/pillar 3 disclosures/2019 provisions coverage by firm.xlsx` | [scripts/derive_firm_provisions.py](scripts/derive_firm_provisions.py) | `processed_inputs/firm_provisions.csv` | `firm_name`, `mort_prov_coverage`, `retail_prov_coverage`, `commercial_prov_coverage` for each of the seven UK banks. SCB has only `commercial_prov_coverage` populated (a flagged "guesstimate" in the source). |
 
+### `processed_inputs/firm_btl.csv` — buy-to-let share of mortgage book
+
+`firm_name`, `btl_share` — buy-to-let balances as a fraction of each firm's UK
+mortgage book. A **single static figure per firm**, applied across every
+stress-test year (deliberately, per the design brief: BTL mix moves slowly, so
+one point is a workable starting proxy rather than tracking it test-by-test).
+Authored directly as a committed CSV (no legacy XLSX, hence no `derive_*`
+script); loaded by `uk_stress_benchmark.provisions.load_btl` and used only by
+the mortgage model.
+
+> **⚠️ Provisional — verify before public launch.** Only Santander UK (~9%,
+> stated as stable year-on-year in its 2025 reporting) is confirmed from a
+> primary source. The remaining figures are approximate placeholders set to the
+> well-established *relative* BTL intensity of each lender (HSBC UK lowest as a
+> late/small BTL entrant; Nationwide via The Mortgage Works and Lloyds via
+> Birmingham Midshires among the highest). They should be replaced with exact
+> figures from each firm's annual report / Pillar 3 disclosure. Standard
+> Chartered is left blank (no UK mortgage book; excluded from modelling anyway).
+
+| Firm | `btl_share` | Basis |
+| --- | --- | --- |
+| Santander UK | 0.09 | Confirmed ~9%, stable YoY (Santander UK 2025 reporting). |
+| Lloyds Banking Group | 0.13 | Placeholder — large BTL lender (Birmingham Midshires / BM Solutions). |
+| Nationwide | 0.15 | Placeholder — largest relative BTL via The Mortgage Works (TMW). |
+| NatWest / RBS Group | 0.11 | Placeholder — moderate BTL book. |
+| Barclays | 0.10 | Placeholder — moderate BTL book. |
+| HSBC | 0.02 | Placeholder — minimal BTL (entered the market late, small book). |
+| Standard Chartered | (blank) | No UK mortgage book; excluded from modelling. |
+
 ### 2021 Solvency Stress Test — scenario only (not a training year)
 
 The 2021 SST *scenario* is ingested (`scenario-2021-stress.csv`, in the manifest)
