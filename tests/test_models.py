@@ -133,3 +133,23 @@ def test_predict_with_model_uses_only_columns_the_model_kept():
     scored = predict_with_model(score_df, model)
     assert "prediction" in scored.columns
     assert bool(scored["prediction"].notna().all())
+
+
+def test_predict_with_model_returns_nan_when_a_required_predictor_is_absent():
+    # A predictor the model kept is missing from the scoring frame entirely.
+    # Rather than raising, the rows come back with NaN predictions — the same
+    # "can't score this" signal as a NaN predictor value — so callers can
+    # simply drop unscored rows without inspecting the model's predictors.
+    fit_df = pd.DataFrame(
+        {
+            "a": [1.0, 2.0, 3.0, 4.0],
+            "b": [0.0, 1.0, 0.0, 1.0],
+            "y": [1.0, 3.5, 3.0, 5.5],
+        }
+    )
+    model = fit_linear_model(fit_df, dependent_var="y", independent_vars=["a", "b"], stepwise=False)
+
+    score_df = pd.DataFrame({"a": [1.0, 2.0]})  # "b" entirely absent
+    scored = predict_with_model(score_df, model)
+    assert "prediction" in scored.columns
+    assert bool(scored["prediction"].isna().all())

@@ -22,6 +22,7 @@ import streamlit as st
 
 from uk_stress_benchmark import __version__
 from uk_stress_benchmark.models import predict_with_model
+from uk_stress_benchmark.per_firm import fit_per_firm_models
 from uk_stress_benchmark.pipeline import (
     RECIPES,
     build_modelling_dataset,
@@ -304,6 +305,13 @@ def _fit_recent_models() -> tuple[list[int], dict]:
     years = sorted(int(y) for y in pd.Series(mdf["acsyear"]).unique())[-3:]
     recent = mdf.loc[pd.Series(mdf["acsyear"]).isin(years)]
     return years, fit_product_models(recent)
+
+
+@st.cache_resource(show_spinner="Fitting a model per firm…")
+def _fit_per_firm():
+    """Per-firm diagnostics, scored against the all-years pooled baseline."""
+    mdf, fitted = _fit_everything()
+    return fit_per_firm_models(mdf, baseline_models=fitted)
 
 
 @st.cache_data
@@ -710,6 +718,88 @@ v{__version__}.
         )
         st.markdown("**Low-point shocks** — the scenario features, by ACS year.")
         st.dataframe(shocks_df.style.format("{:.3f}"), width="stretch")
+
+# --- Per-firm accuracy (research view) -----------------------------------------
+
+# The headline benchmark refuses to key off firm identity. This section does
+# the opposite as a research aside: a separate regression per firm, fitted on
+# that firm's own history, to show how well — and whether better than the
+# pooled model — each firm's losses can be reproduced.
+
+with st.expander("How accurate is the model for each firm?"):
+    st.markdown(
+        f"""
+The headline benchmark deliberately ignores firm identity. This research view
+does the opposite: it fits a **separate regression for each firm**, using only
+that firm's own {year_lo}–{year_hi} stress-test history, to ask how closely a
+firm-specific model tracks that one firm's published losses — and whether it
+beats the pooled model.
+
+Only the macro shocks move within a single firm's rows (its provision coverage
+and buy-to-let share are fixed), so each firm-product model regresses that
+firm's outcomes on scenario severity, with forward-stepwise selection kept
+small enough for the handful of stress tests a firm has faced. Read these as an
+**overfitting diagnostic, not a forecast**: with so few points per firm a high
+R² shows the *shape* of the relationship, not out-of-sample skill. The honest
+column is **firm-model RMSE vs pooled RMSE** — where a firm's own model has a
+much lower error than the pooled model scored on the same rows, that firm's
+losses carry structure the one-size-fits-all benchmark misses.
+"""
+    )
+
+    per_firm = _fit_per_firm()
+    acc = per_firm.accuracy
+
+    # Headline: firm × product in-sample R².
+    r2 = (
+        acc.pivot(index="firm_name", columns="product", values="r_squared")
+        .rename(columns=_PRODUCT_LABELS)
+        .rename(index=_SHORT_FIRM_NAMES)
+    )
+    r2 = r2.loc[:, [c for c in _PRODUCT_LABELS.values() if c in r2.columns]]
+    st.markdown("**In-sample R² — the share of each firm's own loss variation the fit explains.**")
+    st.dataframe(r2.style.format("{:.0%}", na_rep="—"), width="stretch")
+
+    # Detail: one row per firm-product, firm-specific error against the pooled
+    # model's error on the very same rows.
+    detail = acc.assign(
+        product=acc["product"].map(_PRODUCT_LABELS),
+        predictors=acc["predictors"].map(lambda drivers: ", ".join(drivers) if drivers else "—"),
+    ).rename(
+        columns={
+            "firm_name": "Firm",
+            "product": "Product",
+            "n_obs": "Stress tests",
+            "n_predictors": "Drivers",
+            "predictors": "Selected drivers",
+            "r_squared": "R²",
+            "r_squared_adj": "Adj. R²",
+            "rmse": "Firm-model RMSE",
+            "pooled_rmse": "Pooled RMSE",
+        }
+    )
+    st.markdown("**Per-firm fit detail** — firm-specific error vs the pooled model, same rows.")
+    st.dataframe(
+        detail.style.format(
+            {
+                "R²": "{:.2f}",
+                "Adj. R²": "{:.2f}",
+                "Firm-model RMSE": "{:.3%}",
+                "Pooled RMSE": "{:.3%}",
+            },
+            na_rep="—",
+        ),
+        width="stretch",
+        hide_index=True,
+    )
+
+    st.download_button(
+        "Download per-firm accuracy (CSV)",
+        data=acc.to_csv(index=False).encode("utf-8"),
+        file_name="per_firm_accuracy.csv",
+        mime="text/csv",
+        width="stretch",
+    )
 
 st.markdown(
     f"""<div class="footer">Peter McIntyre ·
