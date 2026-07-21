@@ -136,8 +136,8 @@ def test_pooled_rmse_column_only_appears_with_a_baseline():
     withb = fit_per_firm_models(df, min_obs=4, baseline_models=baseline)
     assert "pooled_rmse" in withb.accuracy.columns
     # Every pooled score is a finite, non-negative error.
-    assert (withb.accuracy["pooled_rmse"] >= 0).all()
-    assert withb.accuracy["pooled_rmse"].notna().all()
+    assert bool((withb.accuracy["pooled_rmse"] >= 0).all())
+    assert bool(withb.accuracy["pooled_rmse"].notna().all())
 
 
 def test_models_are_keyed_by_firm_and_product_and_carry_an_intercept():
@@ -187,9 +187,9 @@ def test_real_data_fits_per_firm_models_within_the_df_budget(real_modelling_df: 
     acc = diag.accuracy
     # Every fit spends fewer than n_obs - 1 parameters (intercept + predictors),
     # so no model is saturated and adjusted R^2 is always well defined.
-    assert (acc["n_predictors"] <= acc["n_obs"] - 2).all()
-    assert acc["r_squared_adj"].notna().all()
-    assert acc["rmse"].notna().all()
-    assert (acc["rmse"] >= 0).all()
+    assert bool((acc["n_predictors"] <= acc["n_obs"] - 2).all())
+    assert bool(acc["r_squared_adj"].notna().all())
+    assert bool(acc["rmse"].notna().all())
+    assert bool((acc["rmse"] >= 0).all())
     # The pooled baseline is scored on every firm that supplies its columns.
     assert "pooled_rmse" in acc.columns
