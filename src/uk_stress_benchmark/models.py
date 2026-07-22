@@ -148,9 +148,11 @@ def predict_with_model(
     Parameters
     ----------
     df : pd.DataFrame
-        Frame to score. Must contain every predictor the model needs (a
-        subset of the columns used at fit time, since stepwise may have
-        dropped some).
+        Frame to score. Predictor columns the model doesn't need may be
+        present or absent freely. A predictor the model *does* need but that
+        is missing from ``df`` entirely is treated as all-NaN, so those rows
+        score to NaN rather than raising — the same "can't score this"
+        outcome as a NaN predictor value.
     model : RegressionResults
         Fitted output of :func:`fit_linear_model`.
     actual_col : str | None
@@ -161,12 +163,16 @@ def predict_with_model(
     -------
     pd.DataFrame
         Copy of ``df`` with one extra column ``prediction`` (and optionally
-        ``actual``). Rows where any required predictor is NaN come back
-        with NaN in ``prediction``.
+        ``actual``). Rows where any required predictor is NaN — or whose
+        column the model needs but ``df`` omits — come back with NaN in
+        ``prediction``.
     """
     out = df.copy()
     needed = [c for c in model.params.index if c != "const"]
-    X = sm.add_constant(out[needed].astype(float), has_constant="add")
+    # A needed column the caller didn't supply is materialised as all-NaN, so
+    # its rows fall out as NaN predictions instead of raising a KeyError.
+    supplied = out.reindex(columns=[*out.columns, *[c for c in needed if c not in out.columns]])
+    X = sm.add_constant(supplied[needed].astype(float), has_constant="add")
     out["prediction"] = model.predict(X)
     if actual_col is not None:
         out["actual"] = out[actual_col]
