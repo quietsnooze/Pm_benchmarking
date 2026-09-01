@@ -95,6 +95,41 @@ def test_build_modelling_dataset_excludes_are_case_insensitive():
     assert "HSBC" in firms
 
 
+def test_build_modelling_dataset_broadcasts_static_provisions_across_a_firms_years():
+    # A static (no-acsyear) provisions frame joins on firm_name alone, so
+    # the same coverage figure applies to every one of a firm's rows.
+    df = build_modelling_dataset(_toy_results(), _toy_shocks(), _toy_provisions())
+    barclays = df.loc[df["firm_name"] == "Barclays"]
+    assert len(barclays) == 2  # 2017 and 2018
+    assert barclays["mort_prov_coverage"].nunique() == 1
+    assert barclays["mort_prov_coverage"].iloc[0] == pytest.approx(0.0028)
+
+
+def _toy_panel_provisions() -> pd.DataFrame:
+    # Barclays' mortgage coverage rises year over year; HSBC only has a
+    # 2017 row (its 2018-only counterpart doesn't exist in this toy, but
+    # Nationwide is missing a 2018 row entirely to exercise the drop case).
+    return pd.DataFrame(
+        {
+            "firm_name": ["Barclays", "Barclays", "HSBC", "Nationwide"],
+            "acsyear": [2017, 2018, 2017, 2017],
+            "mort_prov_coverage": [0.0020, 0.0035, 0.0010, 0.0011],
+            "retail_prov_coverage": [0.070, 0.085, 0.037, 0.0911],
+            "commercial_prov_coverage": [0.006, 0.009, 0.0123, 0.005],
+        }
+    )
+
+
+def test_build_modelling_dataset_joins_panel_provisions_by_firm_and_year():
+    df = build_modelling_dataset(_toy_results(), _toy_shocks(), _toy_panel_provisions())
+    barclays = df.loc[df["firm_name"] == "Barclays"].set_index("acsyear")
+    assert barclays.loc[2017, "mort_prov_coverage"] == pytest.approx(0.0020)
+    assert barclays.loc[2018, "mort_prov_coverage"] == pytest.approx(0.0035)
+    # Nationwide has no 2018 provisions row in the panel -> that firm-year
+    # is dropped by the inner join, even though results/shocks have it.
+    assert not ((df["firm_name"] == "Nationwide") & (df["acsyear"] == 2018)).any()
+
+
 def _toy_btl() -> pd.DataFrame:
     return pd.DataFrame(
         {

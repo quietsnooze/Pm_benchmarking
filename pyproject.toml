@@ -29,6 +29,7 @@ sync-sources = "uk_stress_benchmark.sync_sources:main"
 extract-tables = "uk_stress_benchmark.extract_appendix_tables:main"
 extract-scenarios = "uk_stress_benchmark.extract_scenarios:main"
 aggregate-firm-results = "uk_stress_benchmark.aggregate_firm_results:main"
+extract-provisions = "uk_stress_benchmark.extract_provisions:main"
 ingest = "uk_stress_benchmark.ingest:main"
 
 [tool.setuptools.packages.find]

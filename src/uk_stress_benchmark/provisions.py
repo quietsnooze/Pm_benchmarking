@@ -33,6 +33,14 @@ _PROVISION_COLUMNS: tuple[str, ...] = (
     "commercial_prov_coverage",
 )
 
+_PROVISION_PANEL_COLUMNS: tuple[str, ...] = (
+    "firm_name",
+    "acsyear",
+    "mort_prov_coverage",
+    "retail_prov_coverage",
+    "commercial_prov_coverage",
+)
+
 _BTL_COLUMNS: tuple[str, ...] = (
     "firm_name",
     "btl_share",
@@ -88,17 +96,36 @@ def load_provisions(
     Returns
     -------
     pd.DataFrame
-        Rows per firm, with all four canonical columns
-        (``firm_name`` plus the three ``*_prov_coverage`` columns).
-        Missing coverage values come back as NaN.
+        If the CSV has no ``acsyear`` column: one row per firm, with the
+        four canonical columns (``firm_name`` plus the three
+        ``*_prov_coverage`` columns) — a single static figure broadcast
+        across every stress-test year. If the CSV does carry ``acsyear``:
+        one row per (firm, acsyear), with those five columns in order and
+        ``acsyear`` as an integer dtype, giving each firm-year its own
+        coverage figure. Missing coverage values come back as NaN either
+        way.
 
     Raises
     ------
     ValueError
-        If the CSV is missing any of the required columns, or if
-        ``valid_firms`` is provided and the CSV contains a firm not in it.
+        If the CSV is missing any of the required columns, if
+        ``valid_firms`` is provided and the CSV contains a firm not in it,
+        or (panel shape only) if the same (firm_name, acsyear) pair
+        appears more than once.
     """
-    return _load_firm_attributes(path, _PROVISION_COLUMNS, valid_firms)
+    has_year = "acsyear" in pd.read_csv(path, nrows=0).columns
+    if not has_year:
+        return _load_firm_attributes(path, _PROVISION_COLUMNS, valid_firms)
+
+    df = _load_firm_attributes(path, _PROVISION_PANEL_COLUMNS, valid_firms)
+    df["acsyear"] = df["acsyear"].astype(int)
+
+    dupes = df.loc[df.duplicated(subset=["firm_name", "acsyear"], keep=False)]
+    if not dupes.empty:
+        pairs = sorted(set(zip(dupes["firm_name"], dupes["acsyear"], strict=True)))
+        raise ValueError(f"{Path(path).name} has duplicate (firm_name, acsyear) rows: {pairs}")
+
+    return df
 
 
 def load_btl(
