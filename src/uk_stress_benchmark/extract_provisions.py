@@ -41,7 +41,11 @@ _LEI_TO_FIRM: dict[str, str] = {
     "2138005O9XJIJN4JPN90": "The Royal Bank of Scotland Group",
     "549300XFX12G42QIKN82": "Nationwide",
     "U4LOSYZ7YG4W3S5F2G91": "Standard Chartered",
-    "PTCQB104N23FMNK2RZ28": "Santander UK",
+    "PTCQB104N23FMNK2RZ28": "Santander UK",  # Santander UK plc (absent from the files)
+    # Santander UK is consolidated into Banco Santander SA in the exercise;
+    # its book is recovered as Banco Santander's UK (Country 30) slice, on
+    # the same group-UK-geography basis as every other firm here.
+    "5493006QMFDDMYWIAM13": "Santander UK",  # Banco Santander SA
 }
 
 _LABEL_EXPOSURE = "Original Exposure - by exposure class (SA_and_IRB)"
@@ -145,8 +149,12 @@ def _normalise_columns(df: pd.DataFrame) -> pd.DataFrame:
 def extract_coverage(csv_path: Path | str, *, period: int, country: str = "GB") -> pd.DataFrame:
     """Compute per-firm provision coverage for one EBA tr_cre CSV and period.
 
-    Returns one row per firm found in the file for ``period`` (after country
-    and status filtering), with columns ``firm_name``,
+    Uses the ``country``-geography rows (default UK) for each firm, falling
+    back to the firm's all-countries total when it reports no geographic
+    breakdown at all (a UK-only lender such as Nationwide files everything
+    under the total). Returns one row per firm found in the file for
+    ``period`` (after country and status filtering), with columns
+    ``firm_name``,
     ``mort_prov_coverage``, ``retail_prov_coverage``,
     ``commercial_prov_coverage``. A product's coverage is NaN if its
     denominator (gross exposure) is zero or absent.
@@ -202,12 +210,22 @@ def extract_coverage(csv_path: Path | str, *, period: int, country: str = "GB") 
     period_rows["LEI_Code"] = period_rows["LEI_Code"].astype(str).str.strip()
     period_rows["firm_name"] = period_rows["LEI_Code"].map(_LEI_TO_FIRM)
 
-    relevant = period_rows.loc[
-        period_rows["Country"].isin(country_codes)
-        & (period_rows["Status"] == "0")
-        & perf_ok
-        & period_rows["firm_name"].notna()
+    base = period_rows.loc[
+        (period_rows["Status"] == "0") & perf_ok & period_rows["firm_name"].notna()
     ].copy()
+
+    # Per firm, take the requested country's rows, falling back to the
+    # all-countries total only for a firm that reports no geographic
+    # breakdown at all. A UK-only lender (e.g. Nationwide) files everything
+    # under Country 0, so its total is its UK book. An internationally
+    # diversified group reports a distinct UK (30) slice and keeps it — its
+    # global total must never be counted as UK. When ``country`` is already
+    # the total ("00"), the fallback selects nothing new, so this is a no-op.
+    in_requested = base["Country"].isin(country_codes)
+    firms_with_requested = set(base.loc[in_requested, "firm_name"])
+    total_codes = _COUNTRY_CODES["00"]
+    fallback = ~base["firm_name"].isin(firms_with_requested) & base["Country"].isin(total_codes)
+    relevant = base.loc[in_requested | fallback].copy()
 
     lei_per_firm = relevant.groupby("firm_name")["LEI_Code"].unique()
     for firm, leis in lei_per_firm.items():

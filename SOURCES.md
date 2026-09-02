@@ -212,14 +212,26 @@ parser, and it gives the app each firm's most recent coverage.
 `213800LBQA1Y9L22JB70`, Barclays PLC, also mapped in case later files switched),
 HSBC Holdings (`MLU0ZO3ML4LN2LL2TL39`), Lloyds (`549300PPXHEU2JF0AM85`), RBS /
 NatWest (`2138005O9XJIJN4JPN90`), Nationwide (`549300XFX12G42QIKN82`), Standard
-Chartered (`U4LOSYZ7YG4W3S5F2G91`). **Santander UK plc**
-(`PTCQB104N23FMNK2RZ28`) is mapped but its presence as a separate row is
-unconfirmed — it is probably consolidated into Banco Santander, in which case
-Santander UK needs the annual-report route for every year.
+Chartered (`U4LOSYZ7YG4W3S5F2G91`). **Santander UK** is consolidated into
+Banco Santander SA (`5493006QMFDDMYWIAM13`) in the exercise, so its book is
+recovered as Banco Santander's UK (Country 30) slice, on the same
+group-UK-geography basis as every other firm. Santander UK plc's own LEI
+(`PTCQB104N23FMNK2RZ28`) is also mapped for the unlikely case it ever files
+separately; confirmed against the 2020 file, only the Banco Santander LEI
+appears. The Banco Santander slice is mostly Santander UK plc but may include
+other UK lending booked elsewhere in the group — a small, acceptable
+difference given the whole panel is group-UK-geography, flagged here for the
+record.
+
+**Country handling.** Each firm uses its UK-counterparty rows (Country 30 /
+`GB`). A UK-only lender reports no geographic breakdown — Nationwide files
+its whole book under Country 0 (total) — so the extractor falls back to a
+firm's all-countries total when, and only when, it has no UK-geography rows
+at all. A diversified group keeps its UK slice; its global total is never
+counted as UK.
 
 **Product mapping** (SA + IRB rows summed; "of which" sub-rows excluded to
-avoid double counting; counterparty country = UK, code 30 / `GB`; `Status` 0 =
-defaulted + non-defaulted together):
+avoid double counting; `Status` 0 = defaulted + non-defaulted together):
 
 | Product column | IRB exposure classes | SA exposure classes |
 | --- | --- | --- |

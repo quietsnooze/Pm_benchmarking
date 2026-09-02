@@ -358,3 +358,72 @@ def test_extract_coverage_reads_latin1_encoded_file(tmp_path: Path):
     assert len(result) == 1
     assert result.iloc[0]["firm_name"] == "Lloyds Banking Group"
     assert result.iloc[0]["mort_prov_coverage"] == pytest.approx(50 / 20000)
+
+
+def test_extract_coverage_uk_only_lender_falls_back_to_total(tmp_path: Path):
+    # A UK-only lender (Nationwide) reports no geographic breakdown: every
+    # row is Country 0 (total). Its total is its UK book, so coverage is
+    # computed from the total rows rather than dropping the firm.
+    rows = [
+        _row(
+            lei="549300XFX12G42QIKN82",
+            country=0,
+            label=_LABEL_EXPOSURE,
+            portfolio=2,
+            exposure=406,
+            amount=20000,
+        ),
+        _row(
+            lei="549300XFX12G42QIKN82",
+            country=0,
+            label=_LABEL_PROVISIONS,
+            portfolio=2,
+            exposure=406,
+            amount=50,
+        ),
+    ]
+    csv_path = _write_csv(tmp_path / "tr_cre.csv", rows)
+
+    result = extract_coverage(csv_path, period=201812)
+
+    assert result.iloc[0]["firm_name"] == "Nationwide"
+    assert result.iloc[0]["mort_prov_coverage"] == pytest.approx(50 / 20000)
+
+
+def test_extract_coverage_diversified_firm_ignores_total_when_uk_present(tmp_path: Path):
+    # A firm with a distinct UK (30) slice AND an all-countries total (0)
+    # must use only its UK rows; its global total must not be counted, or
+    # coverage would be wrong and the exposure double-counted.
+    rows = [
+        _row(country=30, label=_LABEL_EXPOSURE, portfolio=2, exposure=406, amount=20000),
+        _row(country=30, label=_LABEL_PROVISIONS, portfolio=2, exposure=406, amount=50),
+        _row(country=0, label=_LABEL_EXPOSURE, portfolio=2, exposure=406, amount=999999),
+        _row(country=0, label=_LABEL_PROVISIONS, portfolio=2, exposure=406, amount=88888),
+    ]
+    csv_path = _write_csv(tmp_path / "tr_cre.csv", rows)
+
+    result = extract_coverage(csv_path, period=201812)
+
+    assert result.iloc[0]["mort_prov_coverage"] == pytest.approx(50 / 20000)
+
+
+def test_extract_coverage_maps_banco_santander_uk_slice_to_santander_uk(tmp_path: Path):
+    # Santander UK is consolidated into Banco Santander in the exercise;
+    # its book is the UK (Country 30) slice of Banco Santander's rows. The
+    # firm resolves to "Santander UK" and uses only its UK slice, not the
+    # group's global total.
+    banco = "5493006QMFDDMYWIAM13"
+    rows = [
+        _row(lei=banco, country=30, label=_LABEL_EXPOSURE, portfolio=2, exposure=406, amount=10000),
+        _row(lei=banco, country=30, label=_LABEL_PROVISIONS, portfolio=2, exposure=406, amount=25),
+        _row(lei=banco, country=0, label=_LABEL_EXPOSURE, portfolio=2, exposure=406, amount=500000),
+        _row(
+            lei=banco, country=0, label=_LABEL_PROVISIONS, portfolio=2, exposure=406, amount=44444
+        ),
+    ]
+    csv_path = _write_csv(tmp_path / "tr_cre.csv", rows)
+
+    result = extract_coverage(csv_path, period=201812)
+
+    assert result.iloc[0]["firm_name"] == "Santander UK"
+    assert result.iloc[0]["mort_prov_coverage"] == pytest.approx(25 / 10000)
