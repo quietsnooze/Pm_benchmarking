@@ -112,6 +112,22 @@ TRANSPARENCY_MANIFEST: dict[int, tuple[str, int]] = {
 }
 
 
+def _read_csv(csv_path: Path) -> pd.DataFrame:
+    """Read an EBA tr_cre CSV as strings, tolerating its encoding.
+
+    EBA publishes these files in Latin-1 (bank names carry accented
+    characters such as the o-acute in "Banco Santander"), not UTF-8. Try
+    UTF-8 first so a future UTF-8 export still reads cleanly, then fall back
+    to Latin-1, which maps every byte and so never raises. Downstream only
+    reads ASCII fields — LEI codes, numeric amounts, the English labels — so
+    the fallback decoding of an accented name is harmless.
+    """
+    try:
+        return pd.read_csv(csv_path, dtype=str, encoding="utf-8")
+    except UnicodeDecodeError:
+        return pd.read_csv(csv_path, dtype=str, encoding="latin-1")
+
+
 def _normalise_columns(df: pd.DataFrame) -> pd.DataFrame:
     """Rename columns to their canonical case, matched case-insensitively.
 
@@ -147,7 +163,7 @@ def extract_coverage(csv_path: Path | str, *, period: int, country: str = "GB") 
             f"Unknown country code {country!r}; expected one of {sorted(_COUNTRY_CODES)}"
         )
 
-    df = _normalise_columns(pd.read_csv(csv_path, dtype=str))
+    df = _normalise_columns(_read_csv(csv_path))
 
     missing = [c for c in _REQUIRED_COLUMNS if c not in df.columns]
     if "Label" in missing:

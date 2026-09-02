@@ -339,3 +339,22 @@ def test_extract_coverage_raises_when_only_provisions_label_is_missing(tmp_path:
 
     with pytest.raises(ValueError, match="Value adjustments and provisions"):
         extract_coverage(csv_path, period=201812)
+
+
+def test_extract_coverage_reads_latin1_encoded_file(tmp_path: Path):
+    # Real EBA tr_cre.csv files are Latin-1, not UTF-8 (bank names carry
+    # accented characters). Write a fixture with a Latin-1 byte (0xf3 = o
+    # acute) in the NSA column and confirm the parser reads it rather than
+    # raising UnicodeDecodeError.
+    rows = [
+        _row(label=_LABEL_EXPOSURE, portfolio=2, exposure=406, amount=20000, nsa="España"),
+        _row(label=_LABEL_PROVISIONS, portfolio=2, exposure=406, amount=50, nsa="España"),
+    ]
+    csv_path = tmp_path / "tr_cre.csv"
+    pd.DataFrame(rows, columns=_COLUMNS).to_csv(csv_path, index=False, encoding="latin-1")
+
+    result = extract_coverage(csv_path, period=201812)
+
+    assert len(result) == 1
+    assert result.iloc[0]["firm_name"] == "Lloyds Banking Group"
+    assert result.iloc[0]["mort_prov_coverage"] == pytest.approx(50 / 20000)
