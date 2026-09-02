@@ -302,9 +302,9 @@ def test_build_panel_with_no_files_present_returns_empty_panel_with_columns(tmp_
         "commercial_prov_coverage",
     ]
     assert any("eba-transparency-2018-tr_cre.csv" in note for note in notes)
-    assert not (
-        Path(__file__).resolve().parents[1] / "processed_inputs" / "firm_provisions_annual.csv"
-    ).exists()
+    # build_panel never writes to disk (only main() does), so it must not
+    # have created the panel under tmp_path.
+    assert not (tmp_path / "firm_provisions_annual.csv").exists()
 
 
 def test_extract_coverage_tolerates_lowercase_lei_code_column(tmp_path: Path):
