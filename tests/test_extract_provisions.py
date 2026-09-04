@@ -69,18 +69,6 @@ def _write_csv(path: Path, rows: list[dict]) -> Path:
 
 def test_extract_coverage_computes_hand_checked_ratios(tmp_path: Path):
     rows = [
-        # mortgage: IRB 406 + SA 501
-        _row(label=_LABEL_EXPOSURE, portfolio=2, exposure=406, amount=20000),
-        _row(label=_LABEL_EXPOSURE, portfolio=1, exposure=501, amount=5000),
-        _row(label=_LABEL_PROVISIONS, portfolio=2, exposure=406, amount=50),
-        _row(label=_LABEL_PROVISIONS, portfolio=1, exposure=501, amount=10),
-        # retail: IRB 409 + IRB 410 + SA 404
-        _row(label=_LABEL_EXPOSURE, portfolio=2, exposure=409, amount=1000),
-        _row(label=_LABEL_EXPOSURE, portfolio=2, exposure=410, amount=2000),
-        _row(label=_LABEL_EXPOSURE, portfolio=1, exposure=404, amount=3000),
-        _row(label=_LABEL_PROVISIONS, portfolio=2, exposure=409, amount=10),
-        _row(label=_LABEL_PROVISIONS, portfolio=2, exposure=410, amount=20),
-        _row(label=_LABEL_PROVISIONS, portfolio=1, exposure=404, amount=30),
         # commercial: IRB 303 + SA 303
         _row(label=_LABEL_EXPOSURE, portfolio=2, exposure=303, amount=4000),
         _row(label=_LABEL_EXPOSURE, portfolio=1, exposure=303, amount=6000),
@@ -94,35 +82,37 @@ def test_extract_coverage_computes_hand_checked_ratios(tmp_path: Path):
     assert len(result) == 1
     row = result.iloc[0]
     assert row["firm_name"] == "Lloyds Banking Group"
-    assert row["mort_prov_coverage"] == pytest.approx((50 + 10) / (20000 + 5000))
-    assert row["retail_prov_coverage"] == pytest.approx((10 + 20 + 30) / (1000 + 2000 + 3000))
     assert row["commercial_prov_coverage"] == pytest.approx((40 + 60) / (4000 + 6000))
+    # Mortgage and unsecured retail are not separable from this file (IRB
+    # banks report retail in one aggregate exposure class) — always NaN.
+    assert pd.isna(row["mort_prov_coverage"])
+    assert pd.isna(row["retail_prov_coverage"])
 
 
 def test_extract_coverage_ignores_irrelevant_rows(tmp_path: Path):
     rows = [
-        # In-scope mortgage rows for the requested period.
-        _row(label=_LABEL_EXPOSURE, portfolio=2, exposure=406, amount=20000),
-        _row(label=_LABEL_PROVISIONS, portfolio=2, exposure=406, amount=50),
+        # In-scope commercial rows for the requested period.
+        _row(label=_LABEL_EXPOSURE, portfolio=2, exposure=303, amount=20000),
+        _row(label=_LABEL_PROVISIONS, portfolio=2, exposure=303, amount=50),
         # Different period entirely — must not leak in.
-        _row(period=201712, label=_LABEL_EXPOSURE, portfolio=2, exposure=406, amount=999999),
+        _row(period=201712, label=_LABEL_EXPOSURE, portfolio=2, exposure=303, amount=999999),
         # Country 0 (all-countries total) and country 5 (some other country) —
         # not UK, must be excluded from the default country="GB" query.
-        _row(label=_LABEL_EXPOSURE, portfolio=2, exposure=406, country=0, amount=999999),
-        _row(label=_LABEL_EXPOSURE, portfolio=2, exposure=406, country=5, amount=999999),
-        # "of which" sub-code (408) must not be folded into 406/501.
-        _row(label=_LABEL_EXPOSURE, portfolio=2, exposure=408, amount=999999),
-        _row(label=_LABEL_PROVISIONS, portfolio=2, exposure=408, amount=999999),
+        _row(label=_LABEL_EXPOSURE, portfolio=2, exposure=303, country=0, amount=999999),
+        _row(label=_LABEL_EXPOSURE, portfolio=2, exposure=303, country=5, amount=999999),
+        # "of which" sub-code (304) must not be folded into 303.
+        _row(label=_LABEL_EXPOSURE, portfolio=2, exposure=304, amount=999999),
+        _row(label=_LABEL_PROVISIONS, portfolio=2, exposure=304, amount=999999),
         # Status 2 (a defaulted/non-defaulted breakdown row) must be excluded.
-        _row(label=_LABEL_EXPOSURE, portfolio=2, exposure=406, status=2, amount=999999),
+        _row(label=_LABEL_EXPOSURE, portfolio=2, exposure=303, status=2, amount=999999),
         # Portfolio 0 (total SA+IRB) must be excluded — would double count.
-        _row(label=_LABEL_EXPOSURE, portfolio=0, exposure=406, amount=999999),
+        _row(label=_LABEL_EXPOSURE, portfolio=0, exposure=303, amount=999999),
         # Unknown LEI must be ignored entirely.
         _row(
             lei="UNKNOWNLEI0000000000",
             label=_LABEL_EXPOSURE,
             portfolio=2,
-            exposure=406,
+            exposure=303,
             amount=999999,
         ),
     ]
@@ -133,17 +123,17 @@ def test_extract_coverage_ignores_irrelevant_rows(tmp_path: Path):
     assert len(result) == 1
     row = result.iloc[0]
     assert row["firm_name"] == "Lloyds Banking Group"
-    assert row["mort_prov_coverage"] == pytest.approx(50 / 20000)
+    assert row["commercial_prov_coverage"] == pytest.approx(50 / 20000)
 
 
 def test_extract_coverage_country_00_selects_all_countries_total(tmp_path: Path):
     rows = [
         # UK-only rows (country 30) — must be excluded when querying "00".
-        _row(label=_LABEL_EXPOSURE, portfolio=2, exposure=406, country=30, amount=20000),
-        _row(label=_LABEL_PROVISIONS, portfolio=2, exposure=406, country=30, amount=50),
+        _row(label=_LABEL_EXPOSURE, portfolio=2, exposure=303, country=30, amount=20000),
+        _row(label=_LABEL_PROVISIONS, portfolio=2, exposure=303, country=30, amount=50),
         # All-countries total rows (country 0) — the ones country="00" wants.
-        _row(label=_LABEL_EXPOSURE, portfolio=2, exposure=406, country=0, amount=80000),
-        _row(label=_LABEL_PROVISIONS, portfolio=2, exposure=406, country=0, amount=400),
+        _row(label=_LABEL_EXPOSURE, portfolio=2, exposure=303, country=0, amount=80000),
+        _row(label=_LABEL_PROVISIONS, portfolio=2, exposure=303, country=0, amount=400),
     ]
     csv_path = _write_csv(tmp_path / "tr_cre.csv", rows)
 
@@ -151,25 +141,27 @@ def test_extract_coverage_country_00_selects_all_countries_total(tmp_path: Path)
 
     assert len(result) == 1
     row = result.iloc[0]
-    assert row["mort_prov_coverage"] == pytest.approx(400 / 80000)
+    assert row["commercial_prov_coverage"] == pytest.approx(400 / 80000)
 
 
 def test_extract_coverage_missing_denominator_is_nan_for_that_product_only(tmp_path: Path):
     rows = [
-        # Mortgage: only provisions, no exposure row at all -> NaN.
-        _row(label=_LABEL_PROVISIONS, portfolio=2, exposure=406, amount=50),
-        # Commercial: exposure present and non-zero -> a real ratio.
-        _row(label=_LABEL_EXPOSURE, portfolio=2, exposure=303, amount=4000),
+        # Commercial: only provisions, no exposure row at all -> NaN.
         _row(label=_LABEL_PROVISIONS, portfolio=2, exposure=303, amount=40),
+        # An exposure row for an irrelevant (non-commercial) code, just to
+        # satisfy the both-labels-must-be-present-in-the-file guard without
+        # contributing to the commercial denominator.
+        _row(label=_LABEL_EXPOSURE, portfolio=2, exposure=406, amount=999999),
     ]
     csv_path = _write_csv(tmp_path / "tr_cre.csv", rows)
 
     result = extract_coverage(csv_path, period=201812)
 
     row = result.iloc[0]
+    assert pd.isna(row["commercial_prov_coverage"])
+    # Mortgage and unsecured retail are always NaN from this route, regardless.
     assert pd.isna(row["mort_prov_coverage"])
     assert pd.isna(row["retail_prov_coverage"])
-    assert row["commercial_prov_coverage"] == pytest.approx(40 / 4000)
 
 
 def test_extract_coverage_duplicate_lei_for_same_firm_raises(tmp_path: Path):
@@ -241,8 +233,8 @@ def test_build_panel_skips_absent_files_and_notes_them(tmp_path: Path):
     _write_csv(
         tmp_path / "eba-transparency-2018-tr_cre.csv",
         [
-            _row(period=201712, label=_LABEL_EXPOSURE, portfolio=2, exposure=406, amount=20000),
-            _row(period=201712, label=_LABEL_PROVISIONS, portfolio=2, exposure=406, amount=50),
+            _row(period=201712, label=_LABEL_EXPOSURE, portfolio=2, exposure=303, amount=20000),
+            _row(period=201712, label=_LABEL_PROVISIONS, portfolio=2, exposure=303, amount=50),
         ],
     )
     # 2019 file deliberately absent.
@@ -251,7 +243,9 @@ def test_build_panel_skips_absent_files_and_notes_them(tmp_path: Path):
 
     assert list(panel["acsyear"]) == [2018]
     assert panel.loc[0, "firm_name"] == "Lloyds Banking Group"
-    assert panel.loc[0, "mort_prov_coverage"] == pytest.approx(50 / 20000)
+    assert panel.loc[0, "commercial_prov_coverage"] == pytest.approx(50 / 20000)
+    assert pd.isna(panel.loc[0, "mort_prov_coverage"])
+    assert pd.isna(panel.loc[0, "retail_prov_coverage"])
     assert list(panel.columns) == [
         "firm_name",
         "acsyear",
@@ -270,22 +264,22 @@ def test_build_panel_rounds_coverage_to_6dp_and_sorts_by_firm_then_year(tmp_path
     _write_csv(
         tmp_path / "eba-transparency-2018-tr_cre.csv",
         [
-            _row(period=201712, label=_LABEL_EXPOSURE, portfolio=2, exposure=406, amount=3),
-            _row(period=201712, label=_LABEL_PROVISIONS, portfolio=2, exposure=406, amount=1),
+            _row(period=201712, label=_LABEL_EXPOSURE, portfolio=2, exposure=303, amount=3),
+            _row(period=201712, label=_LABEL_PROVISIONS, portfolio=2, exposure=303, amount=1),
         ],
     )
     _write_csv(
         tmp_path / "eba-transparency-2019-tr_cre.csv",
         [
-            _row(period=201812, label=_LABEL_EXPOSURE, portfolio=2, exposure=406, amount=20000),
-            _row(period=201812, label=_LABEL_PROVISIONS, portfolio=2, exposure=406, amount=50),
+            _row(period=201812, label=_LABEL_EXPOSURE, portfolio=2, exposure=303, amount=20000),
+            _row(period=201812, label=_LABEL_PROVISIONS, portfolio=2, exposure=303, amount=50),
         ],
     )
 
     panel, _notes = build_panel(tmp_path, manifest=manifest)
 
     assert list(panel["acsyear"]) == [2018, 2019]
-    assert panel.loc[0, "mort_prov_coverage"] == round(1 / 3, 6)
+    assert panel.loc[0, "commercial_prov_coverage"] == round(1 / 3, 6)
 
 
 def test_build_panel_with_no_files_present_returns_empty_panel_with_columns(tmp_path: Path):
@@ -309,8 +303,8 @@ def test_build_panel_with_no_files_present_returns_empty_panel_with_columns(tmp_
 
 def test_extract_coverage_tolerates_lowercase_lei_code_column(tmp_path: Path):
     rows = [
-        _row(label=_LABEL_EXPOSURE, portfolio=2, exposure=406, amount=20000),
-        _row(label=_LABEL_PROVISIONS, portfolio=2, exposure=406, amount=50),
+        _row(label=_LABEL_EXPOSURE, portfolio=2, exposure=303, amount=20000),
+        _row(label=_LABEL_PROVISIONS, portfolio=2, exposure=303, amount=50),
     ]
     df = pd.DataFrame(rows, columns=_COLUMNS).rename(columns={"LEI_Code": "LEI_code"})
     csv_path = tmp_path / "tr_cre.csv"
@@ -321,7 +315,7 @@ def test_extract_coverage_tolerates_lowercase_lei_code_column(tmp_path: Path):
     assert len(result) == 1
     row = result.iloc[0]
     assert row["firm_name"] == "Lloyds Banking Group"
-    assert row["mort_prov_coverage"] == pytest.approx(50 / 20000)
+    assert row["commercial_prov_coverage"] == pytest.approx(50 / 20000)
 
 
 def test_extract_coverage_raises_when_only_provisions_label_is_missing(tmp_path: Path):
@@ -347,8 +341,8 @@ def test_extract_coverage_reads_latin1_encoded_file(tmp_path: Path):
     # acute) in the NSA column and confirm the parser reads it rather than
     # raising UnicodeDecodeError.
     rows = [
-        _row(label=_LABEL_EXPOSURE, portfolio=2, exposure=406, amount=20000, nsa="España"),
-        _row(label=_LABEL_PROVISIONS, portfolio=2, exposure=406, amount=50, nsa="España"),
+        _row(label=_LABEL_EXPOSURE, portfolio=2, exposure=303, amount=20000, nsa="España"),
+        _row(label=_LABEL_PROVISIONS, portfolio=2, exposure=303, amount=50, nsa="España"),
     ]
     csv_path = tmp_path / "tr_cre.csv"
     pd.DataFrame(rows, columns=_COLUMNS).to_csv(csv_path, index=False, encoding="latin-1")
@@ -357,7 +351,7 @@ def test_extract_coverage_reads_latin1_encoded_file(tmp_path: Path):
 
     assert len(result) == 1
     assert result.iloc[0]["firm_name"] == "Lloyds Banking Group"
-    assert result.iloc[0]["mort_prov_coverage"] == pytest.approx(50 / 20000)
+    assert result.iloc[0]["commercial_prov_coverage"] == pytest.approx(50 / 20000)
 
 
 def test_extract_coverage_uk_only_lender_falls_back_to_total(tmp_path: Path):
@@ -370,7 +364,7 @@ def test_extract_coverage_uk_only_lender_falls_back_to_total(tmp_path: Path):
             country=0,
             label=_LABEL_EXPOSURE,
             portfolio=2,
-            exposure=406,
+            exposure=303,
             amount=20000,
         ),
         _row(
@@ -378,7 +372,7 @@ def test_extract_coverage_uk_only_lender_falls_back_to_total(tmp_path: Path):
             country=0,
             label=_LABEL_PROVISIONS,
             portfolio=2,
-            exposure=406,
+            exposure=303,
             amount=50,
         ),
     ]
@@ -387,7 +381,7 @@ def test_extract_coverage_uk_only_lender_falls_back_to_total(tmp_path: Path):
     result = extract_coverage(csv_path, period=201812)
 
     assert result.iloc[0]["firm_name"] == "Nationwide"
-    assert result.iloc[0]["mort_prov_coverage"] == pytest.approx(50 / 20000)
+    assert result.iloc[0]["commercial_prov_coverage"] == pytest.approx(50 / 20000)
 
 
 def test_extract_coverage_diversified_firm_ignores_total_when_uk_present(tmp_path: Path):
@@ -395,16 +389,16 @@ def test_extract_coverage_diversified_firm_ignores_total_when_uk_present(tmp_pat
     # must use only its UK rows; its global total must not be counted, or
     # coverage would be wrong and the exposure double-counted.
     rows = [
-        _row(country=30, label=_LABEL_EXPOSURE, portfolio=2, exposure=406, amount=20000),
-        _row(country=30, label=_LABEL_PROVISIONS, portfolio=2, exposure=406, amount=50),
-        _row(country=0, label=_LABEL_EXPOSURE, portfolio=2, exposure=406, amount=999999),
-        _row(country=0, label=_LABEL_PROVISIONS, portfolio=2, exposure=406, amount=88888),
+        _row(country=30, label=_LABEL_EXPOSURE, portfolio=2, exposure=303, amount=20000),
+        _row(country=30, label=_LABEL_PROVISIONS, portfolio=2, exposure=303, amount=50),
+        _row(country=0, label=_LABEL_EXPOSURE, portfolio=2, exposure=303, amount=999999),
+        _row(country=0, label=_LABEL_PROVISIONS, portfolio=2, exposure=303, amount=88888),
     ]
     csv_path = _write_csv(tmp_path / "tr_cre.csv", rows)
 
     result = extract_coverage(csv_path, period=201812)
 
-    assert result.iloc[0]["mort_prov_coverage"] == pytest.approx(50 / 20000)
+    assert result.iloc[0]["commercial_prov_coverage"] == pytest.approx(50 / 20000)
 
 
 def test_extract_coverage_maps_banco_santander_uk_slice_to_santander_uk(tmp_path: Path):
@@ -414,11 +408,11 @@ def test_extract_coverage_maps_banco_santander_uk_slice_to_santander_uk(tmp_path
     # group's global total.
     banco = "5493006QMFDDMYWIAM13"
     rows = [
-        _row(lei=banco, country=30, label=_LABEL_EXPOSURE, portfolio=2, exposure=406, amount=10000),
-        _row(lei=banco, country=30, label=_LABEL_PROVISIONS, portfolio=2, exposure=406, amount=25),
-        _row(lei=banco, country=0, label=_LABEL_EXPOSURE, portfolio=2, exposure=406, amount=500000),
+        _row(lei=banco, country=30, label=_LABEL_EXPOSURE, portfolio=2, exposure=303, amount=10000),
+        _row(lei=banco, country=30, label=_LABEL_PROVISIONS, portfolio=2, exposure=303, amount=25),
+        _row(lei=banco, country=0, label=_LABEL_EXPOSURE, portfolio=2, exposure=303, amount=500000),
         _row(
-            lei=banco, country=0, label=_LABEL_PROVISIONS, portfolio=2, exposure=406, amount=44444
+            lei=banco, country=0, label=_LABEL_PROVISIONS, portfolio=2, exposure=303, amount=44444
         ),
     ]
     csv_path = _write_csv(tmp_path / "tr_cre.csv", rows)
@@ -426,4 +420,4 @@ def test_extract_coverage_maps_banco_santander_uk_slice_to_santander_uk(tmp_path
     result = extract_coverage(csv_path, period=201812)
 
     assert result.iloc[0]["firm_name"] == "Santander UK"
-    assert result.iloc[0]["mort_prov_coverage"] == pytest.approx(25 / 10000)
+    assert result.iloc[0]["commercial_prov_coverage"] == pytest.approx(25 / 10000)

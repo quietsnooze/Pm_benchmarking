@@ -5,12 +5,21 @@ The EBA's EU-wide Transparency Exercise publishes, per exercise year, a long
 row carries a gross exposure amount or a stock of provisions for one
 exposure class, portfolio (standardised / IRB), counterparty country and
 default-status breakdown. This module picks out the UK-counterparty,
-no-breakdown rows for the three product exposure classes the analysis
-tracks (mortgage, unsecured retail, commercial), sums standardised + IRB,
-and divides provisions by gross exposure to get a coverage ratio per firm
-per product — the annual counterpart of the static, hand-compiled
+no-breakdown rows for the Corporates exposure class, sums standardised +
+IRB, and divides provisions by gross exposure to get a commercial coverage
+ratio per firm — the annual counterpart of the static, hand-compiled
 ``processed_inputs/firm_provisions.csv`` (see
 ``scripts/derive_firm_provisions.py``).
+
+**Only commercial coverage is sourced from here (option A).** IRB banks
+(e.g. Lloyds) report retail exposure under one aggregate "Retail" exposure
+class (404) and do not break out mortgages (406) or unsecured retail
+(409/410), so mortgage and unsecured-retail coverage cannot be separated
+from this file. Commercial (Corporates, 303) is clean under both SA and IRB
+reporting and is computed here; mortgage and unsecured-retail coverage stay
+on the annual-report route (the static ``firm_provisions.csv``) and always
+come back as NaN from this module — an honest placeholder, not a blended or
+zero value.
 
 EBA's column naming and exposure-class code list drifted only slightly
 across the 2018-2020 exercises (occasional case changes to ``LEI_Code``);
@@ -79,12 +88,13 @@ _REQUIRED_COLUMNS: tuple[str, ...] = (
     "Amount",
 )
 
-# output product column -> {(portfolio, exposure_code), ...} to sum. Deliberately
-# excludes "of which" sub-rows (407/408/411/412/302/304/305) to avoid double
+# output product column -> {(portfolio, exposure_code), ...} to sum. Only
+# commercial is computed from EBA data (option A — see module docstring);
+# mortgage and unsecured retail are not separable for IRB banks and are
+# always NaN. Portfolio 2 = IRB, 1 = SA; exposure 303 = Corporates.
+# Deliberately excludes "of which" sub-rows (e.g. 304) to avoid double
 # counting.
-_PRODUCT_CODES: dict[str, set[tuple[int, int]]] = {
-    "mort_prov_coverage": {(2, 406), (1, 501)},
-    "retail_prov_coverage": {(2, 409), (2, 410), (1, 404)},
+_EBA_PRODUCT_CODES: dict[str, set[tuple[int, int]]] = {
     "commercial_prov_coverage": {(2, 303), (1, 303)},
 }
 
@@ -154,10 +164,15 @@ def extract_coverage(csv_path: Path | str, *, period: int, country: str = "GB") 
     breakdown at all (a UK-only lender such as Nationwide files everything
     under the total). Returns one row per firm found in the file for
     ``period`` (after country and status filtering), with columns
-    ``firm_name``,
-    ``mort_prov_coverage``, ``retail_prov_coverage``,
-    ``commercial_prov_coverage``. A product's coverage is NaN if its
-    denominator (gross exposure) is zero or absent.
+    ``firm_name``, ``mort_prov_coverage``, ``retail_prov_coverage``,
+    ``commercial_prov_coverage``.
+
+    Only ``commercial_prov_coverage`` is computed (option A — see module
+    docstring): its numerator/denominator are the summed SA+IRB Corporates
+    (303) provisions and gross exposure, NaN if the denominator is zero or
+    absent. ``mort_prov_coverage`` and ``retail_prov_coverage`` are always
+    NaN — IRB banks report retail exposure in one aggregate class, so those
+    two products cannot be separated from this file.
 
     Raises ``ValueError`` if a required column is missing (naming the file
     and, when the file has no ``Label`` column at all, saying it predates
@@ -243,8 +258,12 @@ def extract_coverage(csv_path: Path | str, *, period: int, country: str = "GB") 
     rows: list[dict[str, object]] = []
     for firm in sorted(relevant["firm_name"].unique()):
         firm_rows = relevant.loc[relevant["firm_name"] == firm]
-        row: dict[str, object] = {"firm_name": firm}
-        for product, codes in _PRODUCT_CODES.items():
+        row: dict[str, object] = {
+            "firm_name": firm,
+            "mort_prov_coverage": float("nan"),
+            "retail_prov_coverage": float("nan"),
+        }
+        for product, codes in _EBA_PRODUCT_CODES.items():
             in_product = firm_rows["_code"].isin(codes)
             denominator = firm_rows.loc[
                 in_product & (firm_rows["Label"] == _LABEL_EXPOSURE), "Amount"
@@ -255,7 +274,15 @@ def extract_coverage(csv_path: Path | str, *, period: int, country: str = "GB") 
             row[product] = (numerator / denominator) if denominator else float("nan")
         rows.append(row)
 
-    return pd.DataFrame(rows, columns=["firm_name", *_PRODUCT_CODES.keys()])
+    return pd.DataFrame(
+        rows,
+        columns=[
+            "firm_name",
+            "mort_prov_coverage",
+            "retail_prov_coverage",
+            "commercial_prov_coverage",
+        ],
+    )
 
 
 def build_panel(

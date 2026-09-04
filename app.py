@@ -272,14 +272,18 @@ def _card_head(step: str, eyebrow: str, title: str, sub: str | None = None) -> N
 
 
 def _provisions_path() -> Path:
-    """Prefer the annual (firm x acsyear) provisions panel when ingest has built it.
+    """Always use the static 2019 snapshot in ``firm_provisions.csv``.
 
-    ``firm_provisions_annual.csv`` comes from ``uv run extract-provisions``
-    (EBA transparency-exercise data, see SOURCES.md); until it exists the
-    static 2019 snapshot in ``firm_provisions.csv`` is used as before.
+    ``firm_provisions_annual.csv`` (built by ``uv run extract-provisions``
+    from EBA transparency-exercise data, see SOURCES.md) carries commercial
+    coverage only — IRB banks report retail exposure in one aggregate class,
+    so mortgage and unsecured-retail coverage cannot be separated from it
+    and come back NaN. Switching the app to that file wholesale would strip
+    the mortgage/retail predictors, so it stays a committed data asset that
+    isn't wired into the model yet. Wiring its commercial column in as a
+    per-year overlay on top of the static file is a planned follow-up.
     """
-    annual = PROCESSED / "firm_provisions_annual.csv"
-    return annual if annual.exists() else PROCESSED / "firm_provisions.csv"
+    return PROCESSED / "firm_provisions.csv"
 
 
 @st.cache_data(show_spinner="Loading firm results / provisions…")

@@ -176,11 +176,14 @@ is canonicalised to "The Royal Bank of Scotland Group" for cross-era continuity.
 
 ## Provision coverage by firm — annual sources
 
-`processed_inputs/firm_provisions.csv` is a single 2019 snapshot per firm. The
-annual counterpart, `processed_inputs/firm_provisions_annual.csv` (one row per
-firm × ACS year, plus an `acsyear` column), is built by `uv run
-extract-provisions` from the EBA transparency-exercise files listed below and
-is preferred by the app and the regression when it exists. Coverage means the
+`processed_inputs/firm_provisions.csv` is a single 2019 snapshot per firm and
+is what the app and the regression use. The annual counterpart,
+`processed_inputs/firm_provisions_annual.csv` (one row per firm × ACS year,
+plus an `acsyear` column), is built by `uv run extract-provisions` from the
+EBA transparency-exercise files listed below; it is committed as a data asset
+but carries commercial coverage only (see product mapping below) and isn't
+wired into the app yet — wiring its commercial column in as a per-year
+overlay on top of the static file is a planned follow-up. Coverage means the
 **stock** of provisions ÷ gross exposure by product at the test's start point
 (31 December of the year before the ACS) — not the impairment *charge*.
 
@@ -230,13 +233,20 @@ firm's all-countries total when, and only when, it has no UK-geography rows
 at all. A diversified group keeps its UK slice; its global total is never
 counted as UK.
 
-**Product mapping** (SA + IRB rows summed; "of which" sub-rows excluded to
-avoid double counting; `Status` 0 = defaulted + non-defaulted together):
+**Product mapping — commercial only (option A).** Real 2020 data showed
+that IRB banks (e.g. Lloyds) report retail exposure under one aggregate
+"Retail" exposure class (404) and do not break out mortgages (406) or
+unsecured retail (409/410), so those two products cannot be separated from
+this file. Commercial (Corporates, 303) *is* clean under both SA and IRB
+reporting, so the extractor sums SA + IRB Corporates (`Status` 0 =
+defaulted + non-defaulted together; "of which" sub-rows excluded to avoid
+double counting) into `commercial_prov_coverage`. `mort_prov_coverage` and
+`retail_prov_coverage` always come back NaN from this route by design — an
+honest placeholder, not a blended or zero number — and stay sourced from
+the annual-report route (the static `firm_provisions.csv`) instead.
 
 | Product column | IRB exposure classes | SA exposure classes |
 | --- | --- | --- |
-| `mort_prov_coverage` | 406 Retail – secured by real estate property | 501 Secured by mortgages on immovable property |
-| `retail_prov_coverage` | 409 Retail – qualifying revolving + 410 Retail – other retail | 404 Retail |
 | `commercial_prov_coverage` | 303 Corporates | 303 Corporates |
 
 **Caveats.**
