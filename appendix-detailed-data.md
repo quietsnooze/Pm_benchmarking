@@ -101,8 +101,8 @@ Notes:
 | 2017 | IAS39 | Lloyds Banking Group | unsecured_retail | 339 | 19,562 | 1.7330% | Table 1.9 (Overdrafts 90/1,952) + Table 1.24 Consumer Finance (Credit cards 157/9,843, Loans 92/7,767) | PDF p136 & p144 (2016 ARA) |
 | 2018 | IAS39 | Lloyds Banking Group | mortgage | 1,443 | 292,187 | 0.4939% | Table 1.9: Retail impaired loans and provisions | p123 (PDF p125) |
 | 2018 | IAS39 | Lloyds Banking Group | unsecured_retail | 487 | 27,739 | 1.7557% | Table 1.9: Retail impaired loans and provisions | p123 (PDF p125) |
-| 2019 | IFRS9 | Lloyds Banking Group | mortgage | 1,462 | 289,237 | 0.5055% | Retail, underlying basis: Table 1.10a (gross lending) & Table 1.11a (ECL allowances) | p124 (gross), p126 (allowance) |
-| 2019 | IFRS9 | Lloyds Banking Group | unsecured_retail | 980 | 27,990 | 3.5013% | Retail, underlying basis: Table 1.10a (gross lending) & Table 1.11a (ECL allowances) | p124 (gross), p126 (allowance) |
+| 2019 | IFRS9 | Lloyds Banking Group | mortgage | 460 | 288,235 | 0.1596% | Statutory basis: Table 1.10 (gross) & Table 1.11 (ECL allowance drawn+undrawn) | PDF p126 (gross) & p128 (allowance), 2018 ARA |
+| 2019 | IFRS9 | Lloyds Banking Group | unsecured_retail | 896 | 28,115 | 3.1869% | Statutory basis: Table 1.10 (gross) & Table 1.11 (ECL allowance drawn+undrawn) | PDF p126 (gross) & p128 (allowance), 2018 ARA |
 
 Notes:
 
@@ -112,8 +112,8 @@ Notes:
 - **2017 unsecured_retail** — Unsecured = Credit cards + Loans + Overdrafts (allowance 339m, gross 19,562m). Excludes UK Motor Finance, Europe, Wealth, Retail Business Banking. IAS 39.
 - **2018 mortgage** — Secured = UK residential mortgages. IAS 39 total impairment provisions (incl. collective unidentified) / gross loans and advances. Lloyds' own printed metric is provisions/impaired-loans = 37.1%.
 - **2018 unsecured_retail** — Unsecured = Credit cards (267/18,134) + Loans (107/8,010) + Overdrafts (113/1,595); allowance 487m, gross 27,739m. Excludes UK Motor Finance, Retail Business Banking, Europe. IAS 39 incurred-loss basis (runs below the IFRS 9 unsecured band by design).
-- **2019 mortgage** — Secured = UK residential mortgages (Retail division). Underlying basis (excludes HBOS/MBNA acquisition adjustments); reproduces Lloyds' printed 0.5%. Statutory-basis allowance was GBP460m (Table 1.11).
-- **2019 unsecured_retail** — Unsecured = Credit cards, Loans and Overdrafts (report footnote 2); UK Motor Finance excluded (separate segment). Underlying basis; reproduces printed 3.5%. Statutory-basis allowance was GBP896m (Table 1.11).
+- **2019 mortgage** — Secured = UK residential mortgages. STATUTORY basis (actual IFRS 9 balance sheet, net of HBOS/MBNA pre-acquisition ECL) for cross-firm comparability; reproduces Lloyds' printed 0.2%. Underlying-basis figure was 1,462/289,237 = 0.505%.
+- **2019 unsecured_retail** — Unsecured = Credit cards, Loans and Overdrafts (footnote 2); UK Motor Finance excluded. STATUTORY basis; reproduces printed 3.2%. Underlying-basis figure was 980/27,990 = 3.50%.
 
 ### Nationwide
 
