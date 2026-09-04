@@ -306,9 +306,14 @@ the table below, downloaded directly):
 - Santander UK FY2017 operating-company AR (the catalogued FY2017 entry is only
   an announcement page):
   <https://www.santander.co.uk/assets/s3fs-public/documents/santander_uk_plc_2017_annual_report_opco.pdf>.
-- RBS/NatWest FY2021 group figures from the NatWest Group ARA 2021; the group
-  ARAs for the IAS 39 years and 2019 ACS are still to be sourced (catalogued
-  URLs resolved to ring-fenced RBS plc / RBS N.V., not the group).
+- RBS/NatWest group figures: FY2021 from the NatWest Group ARA 2021; **FY2016
+  (IAS 39) and FY2018 (IFRS 9) from the group's SEC EDGAR Form 20-F** (CIK
+  844150), which reproduces the audited group credit-risk tables verbatim — the
+  natwestgroup.com site exposes only subsidiary PDFs (RBS plc, RBS N.V.), the
+  wrong-entity trap. 20-F URLs:
+  [FY2016](https://www.sec.gov/Archives/edgar/data/844150/000095010317002773/dp74265_20f.htm),
+  [FY2018](https://www.sec.gov/Archives/edgar/data/844150/000110465919011451/a18-40313_120f.htm).
+  Still to source: RBS group FY2015 and FY2017 (2016 and 2018 ACS) — same 20-F route.
 
 Document URLs seen verbatim in search results (unverified by direct download):
 
@@ -365,14 +370,13 @@ mirrored, with source/unit/period/definition, in
 **Progress.** Being filled one firm-year at a time (resumable). Populated
 (ACS years): Lloyds 2016–2019, Nationwide 2016–2019 + 2022, Santander UK
 2016–2019 + 2022, Barclays 2019 + 2022 (ring-fenced Barclays Bank UK PLC),
-HSBC 2016 (HSBC Bank plc) + 2019 + 2022 (HSBC UK Bank plc), RBS/NatWest 2022
-(NatWest Group). Documented gaps: Barclays and HSBC IAS 39 years (2017/2018
+HSBC 2016 (HSBC Bank plc) + 2019 + 2022 (HSBC UK Bank plc), RBS/NatWest 2017 +
+2019 + 2022 (group, via Form 20-F). Documented gaps: Barclays and HSBC IAS 39 years (2017/2018
 ACS) disclose UK gross by product but the impairment allowance only group-wide
 by asset class or by region, so a UK product-coverage ratio can't be computed.
 Standard Chartered is excluded (no UK retail book; excluded from modelling).
-Still open: RBS/NatWest group figures for the IAS 39 years and 2019 ACS (the
-catalogued URLs resolved to ring-fenced/overseas sub entities, not the group)
-and the Phase-2 years (2014, 2015, 2025).
+Still open: RBS/NatWest group figures for 2016 and 2018 ACS (FY2015/FY2017,
+same 20-F route), and the Phase-2 years (2014, 2015, 2025).
 
 ### Checked and not usable
 

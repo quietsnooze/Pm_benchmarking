@@ -175,11 +175,19 @@ Notes:
 
 | ACS | Basis | Entity | Product | Allowance | Gross | Coverage | Source table | Page |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 2017 | IAS39 | The Royal Bank of Scotland Group plc | mortgage | 1,019 | 153,319 | 0.6646% | Sector and geographical concentration (Credit risk): Personal - mortgages | printed p338, FY2016 Form 20-F |
+| 2017 | IAS39 | The Royal Bank of Scotland Group plc | unsecured_retail | 900 | 14,492 | 6.2103% | Sector and geographical concentration (Credit risk): Personal - unsecured | printed p338, FY2016 Form 20-F |
+| 2019 | IFRS9 | The Royal Bank of Scotland Group plc | mortgage | 839 | 165,081 | 0.5082% | Portfolio summary - sector analysis (audited): Personal / Mortgages | printed p137, FY2018 Form 20-F |
+| 2019 | IFRS9 | The Royal Bank of Scotland Group plc | unsecured_retail | 958 | 13,794 | 6.9450% | Portfolio summary - sector analysis (audited): Personal / Credit cards + Other personal | printed p137, FY2018 Form 20-F |
 | 2022 | IFRS9 | NatWest Group plc | mortgage | 768 | 194,011 | 0.3959% | Sector analysis - portfolio summary (audited): Loans / ECL provisions by geography | printed p221 (PDF p112), 2021 ARA |
 | 2022 | IFRS9 | NatWest Group plc | unsecured_retail | 1,174 | 13,369 | 8.7815% | Sector analysis - portfolio summary (audited): Loans / ECL provisions by geography | printed p221 (PDF p112), 2021 ARA |
 
 Notes:
 
+- **2017 mortgage** — Group consolidated (mortgage book 153,319m incl. Ulster/Ireland; total customer loans 327,478m). Provisions = IAS 39 balance-sheet allowance stock (not the P&L charge). Printed 'provisions as % of gross' = 0.7% matches. Higher than peers due to distressed Irish/Ulster tail.
+- **2017 unsecured_retail** — 'Personal - unsecured' is a single IAS 39 line = credit cards + personal loans + overdrafts; excludes 'Finance leases and instalment credit' (12,269m, separate), so no motor. Printed 'provisions as % of gross' = 6.2% matches.
+- **2019 mortgage** — Group consolidated (mortgage book 165,081m; UK 150,233m) - not the ~24bn ring-fenced RBS plc slice. Allowance = total ECL stock, all stages. Mortgages include ~0.7bn Private Banking secured per ECL methodology. IFRS 9.
+- **2019 unsecured_retail** — Unsecured = Credit cards (230/4,216) + Other personal (728/9,578) = 958/13,794. 'Other personal' = unsecured personal loans/overdrafts; no motor/secured in these lines. IFRS 9 ECL, all stages.
 - **2022 mortgage** — Mortgages. Gross = loans gross of ECL; allowance = total ECL provisions (Stages 1-3). NatWest Group consolidated.
 - **2022 unsecured_retail** — Unsecured = Credit cards (260/3,947) + Other personal (914/9,422); allowance 1,174m, gross 13,369m. 'Other personal' = unsecured personal loans/overdrafts; no motor line. IFRS 9.
 
