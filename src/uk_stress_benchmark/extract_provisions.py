@@ -291,6 +291,9 @@ def build_panel(
     """Build the annual coverage panel across every manifest entry present in ``raw_dir``.
 
     Files not present in ``raw_dir`` are skipped (not an error) and noted.
+    A present file the parser cannot read (a pre-2018 exercise without the
+    ``Label`` column, say) is likewise skipped with its reason, so the years
+    that do parse still come through.
     Returns ``(panel, notes)``: ``panel`` has an ``acsyear`` column and rows
     only for the years whose raw file was present; ``notes`` is a list of
     human-readable lines (one per manifest entry) suitable for printing.
@@ -303,7 +306,14 @@ def build_panel(
         if not csv_path.exists():
             notes.append(f"{filename}: SKIPPED (not in raw_inputs/)")
             continue
-        coverage = extract_coverage(csv_path, period=period)
+        try:
+            coverage = extract_coverage(csv_path, period=period)
+        except ValueError as exc:
+            # A file the parser can't read (e.g. a pre-2018 exercise with no
+            # Label column, or a future schema change) is skipped with its
+            # reason, so the years that do parse still come through.
+            notes.append(f"{filename}: SKIPPED ({exc})")
+            continue
         coverage = coverage.copy()
         coverage["acsyear"] = acsyear
         frames.append(coverage)

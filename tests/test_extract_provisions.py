@@ -421,3 +421,29 @@ def test_extract_coverage_maps_banco_santander_uk_slice_to_santander_uk(tmp_path
 
     assert result.iloc[0]["firm_name"] == "Santander UK"
     assert result.iloc[0]["commercial_prov_coverage"] == pytest.approx(25 / 10000)
+
+
+def test_build_panel_skips_unparseable_file_and_keeps_the_rest(tmp_path: Path):
+    # A present-but-unreadable file (here: no Label column, like a pre-2018
+    # exercise) must be skipped with a note, not abort the whole build, so
+    # the years that do parse still come through.
+    good = [
+        _row(label=_LABEL_EXPOSURE, portfolio=2, exposure=303, amount=10000),
+        _row(label=_LABEL_PROVISIONS, portfolio=2, exposure=303, amount=50),
+    ]
+    _write_csv(tmp_path / "good.csv", good)
+
+    # A file with no Label column at all.
+    bad_df = pd.DataFrame([_row()], columns=_COLUMNS).drop(columns=["Label"])
+    bad_df.to_csv(tmp_path / "bad.csv", index=False)
+
+    manifest = {
+        2017: ("bad.csv", 201612),
+        2019: ("good.csv", 201812),
+    }
+    panel, notes = build_panel(tmp_path, manifest=manifest)
+
+    assert list(panel["acsyear"].unique()) == [2019]
+    assert panel.iloc[0]["commercial_prov_coverage"] == pytest.approx(50 / 10000)
+    assert any("bad.csv: SKIPPED" in note for note in notes)
+    assert any("good.csv" in note and "acsyear 2019" in note for note in notes)
