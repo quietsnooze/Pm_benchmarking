@@ -306,14 +306,24 @@ the table below, downloaded directly):
 - Santander UK FY2017 operating-company AR (the catalogued FY2017 entry is only
   an announcement page):
   <https://www.santander.co.uk/assets/s3fs-public/documents/santander_uk_plc_2017_annual_report_opco.pdf>.
-- RBS/NatWest group figures: FY2021 from the NatWest Group ARA 2021; **FY2016
-  (IAS 39) and FY2018 (IFRS 9) from the group's SEC EDGAR Form 20-F** (CIK
+- RBS/NatWest group figures: FY2021/FY2024 from the NatWest Group ARAs; **all
+  IAS 39 years (FY2013–FY2017) from the group's SEC EDGAR Form 20-F** (CIK
   844150), which reproduces the audited group credit-risk tables verbatim — the
   natwestgroup.com site exposes only subsidiary PDFs (RBS plc, RBS N.V.), the
   wrong-entity trap. 20-F URLs:
+  [FY2013](https://www.sec.gov/Archives/edgar/data/844150/000095010314003135/dp45530_20f.htm),
+  [FY2014](https://www.sec.gov/Archives/edgar/data/844150/000095010315002570/dp54511_20f.htm),
+  [FY2015](https://www.sec.gov/Archives/edgar/data/844150/000095010316012074/dp64322_20f.htm),
   [FY2016](https://www.sec.gov/Archives/edgar/data/844150/000095010317002773/dp74265_20f.htm),
+  [FY2017](https://www.sec.gov/Archives/edgar/data/844150/000110465918021202/a18-3556_120f.htm),
   [FY2018](https://www.sec.gov/Archives/edgar/data/844150/000110465919011451/a18-40313_120f.htm).
-  Still to source: RBS group FY2015 and FY2017 (2016 and 2018 ACS) — same 20-F route.
+- Lloyds FY2013 AR, and the FY2021 & FY2024 ARAs (statutory-basis product tables):
+  [2013](https://www.lloydsbankinggroup.com/assets/pdfs/investors/annual-report/2013-download-links/2013_lbg_annual_report.pdf),
+  2021 & 2024 under `.../financial-performance/lloyds-banking-group-plc/{2021,2024}/q4/{year}-lbg-annual-report.pdf`.
+- Barclays FY2014 group AR and the ring-fenced **Barclays Bank UK PLC 2024** AR;
+  HSBC Bank plc 2013 & 2014 subsidiary ARAs and **HSBC UK Bank plc 2024** ARA;
+  Santander UK 2013/2014/2024 ARs — all downloaded directly, in each row's
+  `source_url`.
 
 Document URLs seen verbatim in search results (unverified by direct download):
 
@@ -367,16 +377,20 @@ plausible band (mortgage ~0.05–0.6%, unsecured ~3–12%). Raw figures are
 mirrored, with source/unit/period/definition, in
 [appendix-detailed-data.md](appendix-detailed-data.md).
 
-**Progress.** Being filled one firm-year at a time (resumable). Populated
-(ACS years): Lloyds 2016–2019, Nationwide 2016–2019 + 2022, Santander UK
-2016–2019 + 2022, Barclays 2019 + 2022 (ring-fenced Barclays Bank UK PLC),
-HSBC 2016 (HSBC Bank plc) + 2019 + 2022 (HSBC UK Bank plc), RBS/NatWest 2017 +
-2019 + 2022 (group, via Form 20-F). Documented gaps: Barclays and HSBC IAS 39 years (2017/2018
-ACS) disclose UK gross by product but the impairment allowance only group-wide
-by asset class or by region, so a UK product-coverage ratio can't be computed.
-Standard Chartered is excluded (no UK retail book; excluded from modelling).
-Still open: RBS/NatWest group figures for 2016 and 2018 ACS (FY2015/FY2017,
-same 20-F route), and the Phase-2 years (2014, 2015, 2025).
+**Progress.** Complete across all eight ACS years (2014, 2015, 2016, 2017,
+2018, 2019, 2022, 2025) for the six modelled firms — 96 rows, 82 populated +
+14 documented gaps. Lloyds, Nationwide, Santander UK and RBS/NatWest (group,
+via SEC Form 20-F for the IAS 39 years) are populated for every year. Barclays
+and HSBC are populated for their IFRS 9 years (from the ring-fenced Barclays
+Bank UK PLC / HSBC UK Bank plc reports) but their **IAS 39 years are documented
+gaps**: those group reports disclose UK gross by product yet the impairment
+allowance only group-wide by asset class (Barclays) or by region (HSBC), so a
+UK product-coverage ratio can't be computed — left blank with a note, not
+guessed. Standard Chartered is excluded (no UK retail book; excluded from
+modelling). Two caveats carried in the row notes: Lloyds IFRS 9 years are on
+the statutory basis (matching FY2018); Nationwide FY2025 consolidates the
+acquired Virgin Money (year-end also moved to 31 March), so it is not
+like-for-like with prior Nationwide-only years.
 
 ### Checked and not usable
 

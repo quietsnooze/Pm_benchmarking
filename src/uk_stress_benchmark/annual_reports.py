@@ -71,9 +71,10 @@ _SANE_BANDS: dict[tuple[str, str], tuple[float, float]] = {
     # floor 2.5% not 3%: a prime UK unsecured book (e.g. HSBC UK) sits just
     # under 3% ECL coverage — real, not an error to flag.
     ("IFRS9", "unsecured_retail"): (0.025, 0.12),
-    # ceiling 0.8% not 0.6%: a group mortgage book with a distressed Irish/Ulster
-    # tail (RBS/NatWest, IAS 39 era) runs to ~0.66% — real, not an error.
-    ("IAS39", "mortgage"): (0.0002, 0.008),
+    # ceiling 1.3% not 0.6%: a group mortgage book with a distressed Irish/Ulster
+    # tail (RBS/NatWest, IAS 39 era) runs to ~1.2% at the 2013-14 trough — real
+    # (the filings' own printed provisions-as-%-of-gross confirm it), not an error.
+    ("IAS39", "mortgage"): (0.0002, 0.013),
     ("IAS39", "unsecured_retail"): (0.008, 0.10),
 }
 
