@@ -96,7 +96,8 @@ the app needs without re-running ingest.
 | `src/uk_stress_benchmark/extract_scenarios.py` | Flattens BoE variable-paths workbooks into per-scenario CSVs. |
 | `src/uk_stress_benchmark/aggregate_firm_results.py` | Consolidates the per-table extracts into one tidy `firm_results.csv`. |
 | `src/uk_stress_benchmark/sync_sources.py` | Downloads raw files declared in `SOURCES.md`. |
-| `src/uk_stress_benchmark/ingest.py` | Runs the three ingest steps above in order — the data "build" entrypoint. |
+| `src/uk_stress_benchmark/extract_provisions.py` | Builds the annual provision-coverage panel (`firm_provisions_annual.csv`) from EBA transparency-exercise credit-risk CSVs. |
+| `src/uk_stress_benchmark/ingest.py` | Runs the ingest steps above in order — the data "build" entrypoint. |
 
 Every module in `src/uk_stress_benchmark/` has a test file in `tests/`.
 Two are worth calling out:
@@ -129,6 +130,7 @@ Rebuilding `processed_inputs/` from scratch (requires raw files — see
 uv run sync-sources     # download raw inputs declared in SOURCES.md
 uv run extract-tables   # parse BoE results-PDF impairment tables
 uv run extract-scenarios # flatten BoE variable-paths workbooks
+uv run extract-provisions # EBA transparency CSVs -> annual provision coverage panel
 uv run ingest            # all of the above, in order
 ```
 

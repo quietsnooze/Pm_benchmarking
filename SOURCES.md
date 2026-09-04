@@ -84,11 +84,17 @@ The downloader (`python -m uk_stress_benchmark.sync_sources`) parses the bullet 
 - `november-2018.pdf` → <https://www.bankofengland.co.uk/-/media/boe/files/financial-stability-report/2018/november-2018.pdf>
 - `december-2019.pdf` → <https://www.bankofengland.co.uk/-/media/boe/files/financial-stability-report/2019/december-2019.pdf>
 - `mortgages-estimating-default-correlation-and-forecasting-default-risk.pdf` → <https://www.bankofengland.co.uk/-/media/boe/files/working-paper/2018/mortgages-estimating-default-correlation-and-forecasting-default-risk.pdf>
+- `eba-transparency-2020-tr_cre.csv` → <https://www.eba.europa.eu/sites/default/files/document_library/Risk%20Analysis%20and%20Data/EU%20Wide%20Transparency%20Exercise/2020/Full%20database/885657/tr_cre.csv>
 
 ### URL not yet identified
 
 Files referenced in the legacy folder for which the corresponding BoE publication has not been confirmed. The downloader skips these (no URL on the line):
 
+- `eba-transparency-2015-tr_cre.csv` — credit-risk CSV from the 2015 EU-wide transparency exercise "Full database" download. Grab it from the 2015 landing page listed under *Provision coverage by firm — annual sources* below; the URL path contains a numeric folder that search did not surface.
+- `eba-transparency-2016-tr_cre.csv` — credit-risk CSV from the 2016 EU-wide transparency exercise "Full database" download. Grab it from the 2016 landing page listed under *Provision coverage by firm — annual sources* below; the URL path contains a numeric folder that search did not surface.
+- `eba-transparency-2017-tr_cre.csv` — credit-risk CSV from the 2017 EU-wide transparency exercise "Full database" download. Grab it from the 2017 landing page listed under *Provision coverage by firm — annual sources* below; the URL path contains a numeric folder that search did not surface.
+- `eba-transparency-2018-tr_cre.csv` — credit-risk CSV from the 2018 EU-wide transparency exercise "Full database" download. Grab it from the 2018 landing page listed under *Provision coverage by firm — annual sources* below; the URL path contains a numeric folder that search did not surface.
+- `eba-transparency-2019-tr_cre.csv` — credit-risk CSV from the 2019 EU-wide transparency exercise "Full database" download. Grab it from the 2019 landing page listed under *Provision coverage by firm — annual sources* below; the URL path contains a numeric folder that search did not surface.
 - `effectiveness-of-stresstesting-model-risk-management.pdf` — likely either SS3/18 *Model risk management principles for stress testing* (PRA, 2018) or a renamed copy of the 2019 *Effectiveness of stress testing framework and its implementation* paper. To resolve, open the local PDF and check its title/cover page.
 
 ## Local-only data (not downloadable)
@@ -167,6 +173,232 @@ later obtained, add it to the verified-URLs list and let `extract-tables`
 regenerate the CSV to confirm the transcription. Per the annex's own footnote,
 the "Nationwide" figures include Virgin Money UK heritage, and "NatWest Group"
 is canonicalised to "The Royal Bank of Scotland Group" for cross-era continuity.
+
+## Provision coverage by firm — annual sources
+
+`processed_inputs/firm_provisions.csv` is a single 2019 snapshot per firm and
+is what the app and the regression use. The annual counterpart,
+`processed_inputs/firm_provisions_annual.csv` (one row per firm × ACS year,
+plus an `acsyear` column), is built by `uv run extract-provisions` from the
+EBA transparency-exercise files listed below; it is committed as a data asset
+but carries commercial coverage only (see product mapping below) and isn't
+wired into the app yet — wiring its commercial column in as a per-year
+overlay on top of the static file is a planned follow-up. Coverage means the
+**stock** of provisions ÷ gross exposure by product at the test's start point
+(31 December of the year before the ACS) — not the impairment *charge*.
+
+### Primary: EBA EU-wide Transparency Exercise (2015–2020 exercises)
+
+The only standardised, machine-readable, bank-by-bank source found. The
+credit-risk file (`tr_cre.csv`, one per exercise) carries "Original Exposure"
+and "Value adjustments and provisions" by exposure class, portfolio (SA / IRB),
+counterparty country and reference period. UK banks are in the sample up to the
+**spring 2020** exercise (last data point 31 Dec 2019); from the 2021 exercise
+they are absent (post-Brexit), so 2022 and 2025 tests need the fallback below.
+
+| ACS year | Start point | Exercise | `raw_inputs/` filename | `Period` | Download URL |
+| --- | --- | --- | --- | --- | --- |
+| 2014 | 31 Dec 2013 | — (2013 exercise stops at Jun 2013; the 2014 EU-wide *stress test* templates carry Dec 2013 credit-risk data — unverified) | — | — | not covered |
+| 2015 | 31 Dec 2014 | 2015 | `eba-transparency-2015-tr_cre.csv` | 201412 | not yet identified (see below) |
+| 2016 | 31 Dec 2015 | 2016 | `eba-transparency-2016-tr_cre.csv` | 201512 | not yet identified |
+| 2017 | 31 Dec 2016 | 2017 | `eba-transparency-2017-tr_cre.csv` | 201612 | not yet identified |
+| 2018 | 31 Dec 2017 | 2018 | `eba-transparency-2018-tr_cre.csv` | 201712 | not yet identified |
+| 2019 | 31 Dec 2018 | 2019 | `eba-transparency-2019-tr_cre.csv` | 201812 | not yet identified |
+| (none) | 31 Dec 2019 | spring 2020 | `eba-transparency-2020-tr_cre.csv` | 201912 | **verified** — in the verified-URLs list |
+
+The 2020 file has no matching ACS but is kept in the manifest: it is the only
+file whose URL was seen verbatim, so it is the real-data smoke test for the
+parser, and it gives the app each firm's most recent coverage.
+
+**Firms in the sample** (LEIs used by the extractor): Barclays
+(`G5GSEF7VJP5I7OUK5573`, Barclays Bank PLC — the LEI the 2018 files used;
+`213800LBQA1Y9L22JB70`, Barclays PLC, also mapped in case later files switched),
+HSBC Holdings (`MLU0ZO3ML4LN2LL2TL39`), Lloyds (`549300PPXHEU2JF0AM85`), RBS /
+NatWest (`2138005O9XJIJN4JPN90`), Nationwide (`549300XFX12G42QIKN82`), Standard
+Chartered (`U4LOSYZ7YG4W3S5F2G91`). **Santander UK** is consolidated into
+Banco Santander SA (`5493006QMFDDMYWIAM13`) in the exercise, so its book is
+recovered as Banco Santander's UK (Country 30) slice, on the same
+group-UK-geography basis as every other firm. Santander UK plc's own LEI
+(`PTCQB104N23FMNK2RZ28`) is also mapped for the unlikely case it ever files
+separately; confirmed against the 2020 file, only the Banco Santander LEI
+appears. The Banco Santander slice is mostly Santander UK plc but may include
+other UK lending booked elsewhere in the group — a small, acceptable
+difference given the whole panel is group-UK-geography, flagged here for the
+record.
+
+**Country handling.** Each firm uses its UK-counterparty rows (Country 30 /
+`GB`). A UK-only lender reports no geographic breakdown — Nationwide files
+its whole book under Country 0 (total) — so the extractor falls back to a
+firm's all-countries total when, and only when, it has no UK-geography rows
+at all. A diversified group keeps its UK slice; its global total is never
+counted as UK.
+
+**Product mapping — commercial only (option A).** Real 2020 data showed
+that IRB banks (e.g. Lloyds) report retail exposure under one aggregate
+"Retail" exposure class (404) and do not break out mortgages (406) or
+unsecured retail (409/410), so those two products cannot be separated from
+this file. Commercial (Corporates, 303) *is* clean under both SA and IRB
+reporting, so the extractor sums SA + IRB Corporates (`Status` 0 =
+defaulted + non-defaulted together; "of which" sub-rows excluded to avoid
+double counting) into `commercial_prov_coverage`. `mort_prov_coverage` and
+`retail_prov_coverage` always come back NaN from this route by design — an
+honest placeholder, not a blended or zero number — and stay sourced from
+the annual-report route (the static `firm_provisions.csv`) instead.
+
+| Product column | IRB exposure classes | SA exposure classes |
+| --- | --- | --- |
+| `commercial_prov_coverage` | 303 Corporates | 303 Corporates |
+
+**Caveats.**
+
+- The parser was validated against synthetic fixtures only: the build sandbox
+  could not reach eba.europa.eu. Run `uv run sync-sources && uv run
+  extract-provisions` locally; the first real run should be on the 2020 file.
+  A label rename or a missing column raises a `ValueError` that lists what the
+  file actually contains.
+- 2015–2017 files may predate the text `Label` column (numeric `Item` codes
+  only, decoded by that year's data dictionary). The extractor refuses those
+  with a clear message; extending it needs the per-year dictionary.
+- IAS 39 → IFRS 9 on 1 Jan 2018: provisions jump on transition, so the Dec 2017
+  (2018 ACS) and Dec 2018 (2019 ACS) figures sit either side of a regime break.
+  Consider a post-IFRS 9 dummy before pooling.
+- EBA definitions (value adjustments ÷ original exposure, UK counterparties)
+  differ from the hand-compiled 2019 snapshot. Do not mix the two files in one
+  fit; the app switches wholesale to the annual panel when it exists.
+- Landing pages: 2015 <https://www.eba.europa.eu/risk-and-data-analysis/risk-analysis/2015-eu-wide-transparency-exercise>,
+  2016 <https://www.eba.europa.eu/risk-and-data-analysis/risk-analysis/eu-wide-transparency-exercise/2016-eu-wide-transparency>,
+  2017 <https://www.eba.europa.eu/risk-and-data-analysis/risk-analysis/2017-eu-wide-transparency-exercise>,
+  2018 <https://www.eba.europa.eu/risk-and-data-analysis/risk-analysis/2018-eu-wide-transparency-exercise>,
+  2019 <https://www.eba.europa.eu/risk-and-data-analysis/risk-analysis/eu-wide-transparency-exercise/2019-eu-wide-transparency>,
+  2020 <https://www.eba.europa.eu/risk-and-data-analysis/risk-analysis/eu-wide-transparency-exercise/2020-eu-wide-transparency>.
+  Each has a "Full database" link; the 2019 folder is
+  `.../EU%20Wide%20Transparency%20Exercise/2019/Full%20database/` (its
+  `TR_Metadata.xlsx` was seen there), the 2020 one adds a numeric subfolder.
+
+### Fallback: firm annual reports / Pillar 3 (hand transcription)
+
+Needed for the 2014, 2022 and 2025 tests, for Santander UK, and to cross-check
+the EBA figures. Add rows to `firm_provisions_annual.csv` by hand; an extra
+`source` column is allowed (the loader drops it). Tables to use:
+
+| Firm | Table | Notes |
+| --- | --- | --- |
+| Barclays | Credit risk → "Loans and advances at amortised cost by product" (coverage ratio column); IFRS 9 era: "by stage" table | Group-level; ring-fenced Barclays Bank UK PLC reports separately from 2018 |
+| HSBC | "Impairment allowances by industry sector" (Personal / Corporate & commercial); IFRS 9 era: "Allowance for ECL by stage" | Group segmentation is by industry/region; UK product split is in HSBC UK Bank plc accounts from 2018 |
+| Lloyds | Asset quality → "Impaired loans and provisions by division"; IFRS 9 era: "ECL allowance and coverage by segment" (UK mortgages, credit cards) | Pillar 3 carries EU CR1-A |
+| RBS / NatWest | "Risk elements in lending (REIL) and provisions by sector" ("provision coverage of REIL"); IFRS 9 era: "ECL allowance and coverage ratio by segment" | Some FY2014–2016 links below are results announcements, not the full ARA |
+| Nationwide | Financial statements notes: residential mortgages and consumer banking impairment provisions | Fiscal year ends 4 April; use the April year-end nearest the start point |
+| Santander UK | Credit risk → Retail Banking / Corporate & Commercial Banking loss allowance and NPL coverage | Entity changed to Santander UK Group Holdings plc from 2016 |
+| Standard Chartered | "Loans and advances by client segment" with stage 3 cover ratio | Book is Asia/Africa/ME; excluded from modelling anyway |
+
+Document URLs verified and used during transcription (corrections/additions to
+the table below, downloaded directly):
+
+- Barclays FY2018/FY2021 UK product split comes from the ring-fenced **Barclays
+  Bank UK PLC** ARAs (the group AR URL served Barclays Bank PLC — wrong entity):
+  [BBUK 2018](https://home.barclays/content/dam/home-barclays/documents/investor-relations/reports-and-events/annual-reports/2018/2018-barclays-bank-uk-plc-annual-report.pdf),
+  [BBUK 2021](https://home.barclays/content/dam/home-barclays/documents/investor-relations/reports-and-events/annual-reports/2021/Barclays-Bank-UK-PLC-2021-Annual-Report.pdf).
+- Barclays FY2017 IAS 39 group AR (full, not the transition note):
+  <https://home.barclays/content/dam/home-barclays/documents/investor-relations/annualreports/ar2017/Barclays%20PLC%20Annual%20Report%202017.pdf>.
+- HSBC UK product split comes from the UK subsidiaries (group ARA is regional):
+  HSBC Bank plc 2015 (FY2015) and **HSBC UK Bank plc** 2018/2021 (FY2018/FY2021),
+  all in GBP not USD.
+- Santander UK FY2017 operating-company AR (the catalogued FY2017 entry is only
+  an announcement page):
+  <https://www.santander.co.uk/assets/s3fs-public/documents/santander_uk_plc_2017_annual_report_opco.pdf>.
+- RBS/NatWest group figures: FY2021/FY2024 from the NatWest Group ARAs; **all
+  IAS 39 years (FY2013–FY2017) from the group's SEC EDGAR Form 20-F** (CIK
+  844150), which reproduces the audited group credit-risk tables verbatim — the
+  natwestgroup.com site exposes only subsidiary PDFs (RBS plc, RBS N.V.), the
+  wrong-entity trap. 20-F URLs:
+  [FY2013](https://www.sec.gov/Archives/edgar/data/844150/000095010314003135/dp45530_20f.htm),
+  [FY2014](https://www.sec.gov/Archives/edgar/data/844150/000095010315002570/dp54511_20f.htm),
+  [FY2015](https://www.sec.gov/Archives/edgar/data/844150/000095010316012074/dp64322_20f.htm),
+  [FY2016](https://www.sec.gov/Archives/edgar/data/844150/000095010317002773/dp74265_20f.htm),
+  [FY2017](https://www.sec.gov/Archives/edgar/data/844150/000110465918021202/a18-3556_120f.htm),
+  [FY2018](https://www.sec.gov/Archives/edgar/data/844150/000110465919011451/a18-40313_120f.htm).
+- Lloyds FY2013 AR, and the FY2021 & FY2024 ARAs (statutory-basis product tables):
+  [2013](https://www.lloydsbankinggroup.com/assets/pdfs/investors/annual-report/2013-download-links/2013_lbg_annual_report.pdf),
+  2021 & 2024 under `.../financial-performance/lloyds-banking-group-plc/{2021,2024}/q4/{year}-lbg-annual-report.pdf`.
+- Barclays FY2014 group AR and the ring-fenced **Barclays Bank UK PLC 2024** AR;
+  HSBC Bank plc 2013 & 2014 subsidiary ARAs and **HSBC UK Bank plc 2024** ARA;
+  Santander UK 2013/2014/2024 ARs — all downloaded directly, in each row's
+  `source_url`.
+
+Document URLs seen verbatim in search results (unverified by direct download):
+
+| Firm | FY2013 | FY2014 | FY2015 | FY2016 | FY2017 | FY2018 | FY2021 | FY2024 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Barclays | [AR](https://www.home.barclays/content/dam/home-barclays/documents/investor-relations/annualreports/ar2013/2013-barclays-annual-report-final.pdf) | [archive](https://home.barclays/investor-relations/reports-and-events/annual-reports/) | [AR](https://www.home.barclays/content/dam/home-barclays/documents/investor-relations/annualreports/ar2015/Barclays_PLC_Annual_Report_2015.pdf) | [AR](https://home.barclays/content/dam/home-barclays/documents/investor-relations/reports-and-events/annual-reports/Barclays-PLC-Annual-Report-2016-FINAL.pdf) | [IFRS 9 transition note](https://home.barclays/content/dam/home-barclays/documents/investor-relations/ResultAnnouncements/2017FYResults/20180308_IFRS9_Transition_Note.pdf) | [AR](https://home.barclays/content/dam/home-barclays/documents/investor-relations/reports-and-events/annual-reports/2018/barclays-plc-annual-report-2018.pdf) | [Pillar 3 Q1](https://home.barclays/content/dam/home-barclays/documents/investor-relations/ResultAnnouncements/Q12021/20210430-BarclaysPLC-Pillar3-Report.pdf) | [Pillar 3](https://home.barclays/content/dam/home-barclays/documents/investor-relations/ResultAnnouncements/FullYear2024Results/FY24-Barclays-PLC-Pillar-3-Report.pdf) |
+| HSBC | [ARA](https://www.hsbc.com/-/files/hsbc/investors/investing-in-hsbc/all-reporting/group/2013/annual-results-2013/annual-reports-accounts-2013.pdf) | — | [HSBC Bank plc ARA](https://www.hsbc.com/-/files/hsbc/investors/investing-in-hsbc/all-reporting/subsidiaries/2015/annual-results/hsbc-bank-plc/hsbc-bank-plc-annual-report-and-accounts-2015.pdf) | [ARA](https://www.hsbc.com/-/files/hsbc/investors/investing-in-hsbc/all-reporting/group/2016/annual-results/hsbc-holdings-plc/170221-annual-report-and-accounts-2016.pdf) | [Pillar 3](https://www.hsbc.com/-/files/hsbc/investors/investing-in-hsbc/all-reporting/group/2017/annual-results/hsbc-holdings-plc/180220-pillar-3-disclosures-31-december-2017.pdf) | [ARA](https://www.hsbc.com/-/files/hsbc/investors/hsbc-results/2018/annual/hsbc-holdings-plc/190219-annual-report-and-accounts-2018.pdf) / [HSBC UK Bank plc](https://www.hsbc.com/-/files/hsbc/investors/hsbc-results/2018/annual/hsbc-uk-bank-plc/190219-annual-report-and-accounts-2018.pdf) | [HSBC UK Bank plc ARA](https://www.hsbc.com/-/files/hsbc/investors/hsbc-results/2021/annual/pdfs/hsbc-uk-bank-plc/220222-annual-report-and-accounts-2021.pdf) | [ARA](https://www.hsbc.com/-/files/hsbc/investors/hsbc-results/2024/annual/pdfs/hsbc-holdings-plc/250219-annual-report-and-accounts-2024.pdf) |
+| Lloyds | [archive](https://www.lloydsbankinggroup.com/investors/annual-report/annual-report-archive.html) | — | [AR](https://www.lloydsbankinggroup.com/assets/pdfs/investors/annual-report/2015-download-links/2015_lbg_annual_report.pdf) | [AR](https://www.lloydsbankinggroup.com/assets/pdfs/investors/annual-report/2016-download-links/2016_lbg_annual_report.pdf) | [AR](https://www.lloydsbankinggroup.com/assets/pdfs/investors/annual-report/2017-download-links/2017_lbg_annual_report.pdf) | [AR](https://www.lloydsbankinggroup.com/assets/pdfs/investors/annual-report/2018-download-links/2018_lbg_annual_report.pdf) | [Pillar 3](https://www.lloydsbankinggroup.com/assets/pdfs/investors/financial-performance/lloyds-banking-group-plc/2021/q4/2021-lbg-fy-pillar3.pdf) | [archive](https://www.lloydsbankinggroup.com/investors/annual-report/annual-report-archive/annual-report-2024.html) |
+| RBS / NatWest | [ARA](https://www.investors.rbs.com/~/media/Files/R/RBS-IR-V2/2013-reports/annual-report-and-accounts-2013.pdf) | [results](https://investors.natwestgroup.com/~/media/Files/R/RBS-IR-V2/annual-reports/rbs-ca.pdf) | [results](https://investors.natwestgroup.com/~/media/Files/R/RBS-IR-V2/annual-reports/rbs-plc-full-year-results-2015.pdf) | [results](https://investors.natwestgroup.com/~/media/Files/R/RBS-IR-V2/results-center/rbs-group-announcement-24-02-2017.pdf) | [ARA](https://investors.natwestgroup.com/~/media/Files/R/RBS-IR-V2/annual-report-2017/royal-bank%20of-scotland-annual-report-and-accounts%202017.pdf) | [ARA](https://www.investors.rbs.com/~/media/Files/R/RBS-IR-V2/results-center/15-02-2019/rbs-plc-ara-2018.pdf) | [ARA](https://investors.natwestgroup.com/~/media/Files/R/RBS-IR-V2/results-center/18022022/natwest-group-annual-report-accounts-2021.pdf) | [ARA](https://www.investors.rbs.com/~/media/Files/R/RBS-IR-V2/results-center/14022025/nwg-annual-report-and-accounts-2024.pdf) |
+| Nationwide (FYE Apr of following year) | [ARA 2014](https://www.nationwide.co.uk/-/assets/nationwidecouk/documents/about/how-we-are-run/results-and-accounts/2013-2014/annual-results-and-accounts-2014.pdf) | [ARA 2015](https://www.nationwide.co.uk/-/assets/nationwidecouk/documents/about/how-we-are-run/results-and-accounts/2014-2015/annual-report-and-accounts-2015.pdf) | [ARA 2016](https://www.nationwide.co.uk/-/assets/nationwidecouk/documents/about/how-we-are-run/results-and-accounts/2015-2016/annual-report-and-accounts-2016.pdf) | — | [ARA 2018](https://www.nationwide.co.uk/-/assets/nationwidecouk/documents/about/how-we-are-run/results-and-accounts/2017-2018/annual-report-and-accounts-2018.pdf) | [ARA 2019](https://www.nationwide.co.uk/-/assets/nationwidecouk/documents/about/how-we-are-run/results-and-accounts/2018-2019/annual-report-and-accounts-2019.pdf) | [ARA 2022](https://www.nationwide.co.uk/-/assets/nationwidecouk/documents/about/how-we-are-run/results-and-accounts/2021-2022/annual-report-and-accounts-2022.pdf) | [ARA 2025](https://www.nationwide.co.uk/-/assets/nationwidecouk/documents/about/how-we-are-run/results-and-accounts/2024-2025/annual-report-and-accounts-2025.pdf) |
+| Santander UK | [AR](https://www.santander.co.uk/assets/s3fs-public/documents/sanuk-2013-annual-report.pdf) | [AR](https://www.santander.co.uk/assets/s3fs-public/documents/2014_annual_report.pdf) | [AR](https://www.santander.co.uk/assets/s3fs-public/documents/santander_uk_plc_2015_annual_report_final.pdf) | [AR](https://assets.santandermedia.com/adobe/assets/urn:aaid:aem:0fcc03f2-b9cd-47d4-b8f8-9af17b06b32b/original/as/santander_uk_plc_2016_annual_report.pdf) | [announcement page](https://www.santander.co.uk/about-santander/investor-relations/stock-exchange-announcements/santander-uk-plc-2017-annual-report) | [AR](https://www.santander.co.uk/assets/s3fs-public/documents/2018_annual_report_santander_uk_plc-v2.pdf) | [Group Holdings AR](https://www.santander.co.uk/assets/s3fs-public/documents/santander_uk_group_holdings_plc_2021_annual_report_1.pdf) | [AR](https://www.santander.co.uk/assets/s3fs-public/documents/Santander%20UK%20plc%202024%20Annual%20Report.pdf) |
+| Standard Chartered | [AR (mirror)](https://www.annualreports.com/HostedData/AnnualReportArchive/s/LSE_STAN_2013.pdf) | [AR](https://www.sc.com/EN/uploads/sites/66/content/docs/Annual_Report_2014.pdf) | — | — | [AR](https://www.sc.com/EN/uploads/sites/66/content/docs/Standard-Chartered-PLC-2017-Annual-Report.pdf) | [supplementary info](https://www.sc.com/en/uploads/sites/66/content/docs/supplementary-information-2018.pdf) | [financial statements](https://www.sc.com/en/uploads/sites/66/content/docs/annual-report-2021-financial-statements-and-notes.pdf) | [AR](https://www.sc.com/en/uploads/sites/66/content/docs/standard-chartered-plc-full-year-2024-report.pdf) |
+
+### Derived table: `processed_inputs/firm_provisions_annual_reports.csv`
+
+The mortgage and unsecured-retail coverage the EBA file cannot supply (IRB
+banks report retail in one aggregate class), transcribed by hand from the
+firm annual reports / Pillar 3 disclosures above and committed as a
+long-format panel — one row per firm × ACS year × product. It complements
+the EBA-sourced commercial column; merging the two into a single annual
+panel (annual-report mortgage/retail + EBA commercial) and wiring it into
+the model is a planned follow-up, not yet done.
+
+**Columns.** `firm_name, acsyear, product ("mortgage"|"unsecured_retail"),
+allowance, gross_loans, coverage, basis ("IAS39"|"IFRS9"), entity, currency,
+source_url, source_table, source_page, notes`. Provenance attaches to every
+number (table title + page), and both the numerator (`allowance`, the
+balance-sheet impairment stock) and denominator (`gross_loans`) are kept so
+`coverage = allowance / gross_loans` can be re-derived.
+
+**Definitions.**
+
+- **Coverage** = impairment allowance (balance-sheet stock, *not* the P&L
+  charge) ÷ gross loans, per product, at the test start point (31 December of
+  the year before the ACS; Nationwide uses its nearest 4 April year-end).
+- **mortgage** = UK residential mortgages. **unsecured_retail** = credit cards
+  + personal loans + overdrafts (excludes auto/motor and secured lending).
+- **basis**: IAS 39 (incurred loss) for FY2017 and earlier; IFRS 9 (ECL) from
+  FY2018. Not comparable across the 1 Jan 2018 transition — each step flagged.
+- **entity**: group level, except where only a ring-fenced UK sub (HSBC UK
+  Bank plc, Barclays Bank UK PLC, both from 2018) gives the UK product split.
+- A firm-year that reports only a blended retail line (no mortgage/unsecured
+  split) is left blank with an explaining note — not guessed.
+
+**Tooling.** `uv run validate-annual-reports`
+(`src/uk_stress_benchmark/annual_reports.py`) loads the file, checks the
+required columns, product/basis vocabularies and numerator/denominator
+completeness, recomputes `coverage` and refuses any hand-entered ratio that
+contradicts its two figures, and flags any coverage outside its product's
+plausible band (mortgage ~0.05–0.6%, unsecured ~3–12%). Raw figures are
+mirrored, with source/unit/period/definition, in
+[appendix-detailed-data.md](appendix-detailed-data.md).
+
+**Progress.** Complete across all eight ACS years (2014, 2015, 2016, 2017,
+2018, 2019, 2022, 2025) for the six modelled firms — 96 rows, 82 populated +
+14 documented gaps. Lloyds, Nationwide, Santander UK and RBS/NatWest (group,
+via SEC Form 20-F for the IAS 39 years) are populated for every year. Barclays
+and HSBC are populated for their IFRS 9 years (from the ring-fenced Barclays
+Bank UK PLC / HSBC UK Bank plc reports) but their **IAS 39 years are documented
+gaps**: those group reports disclose UK gross by product yet the impairment
+allowance only group-wide by asset class (Barclays) or by region (HSBC), so a
+UK product-coverage ratio can't be computed — left blank with a note, not
+guessed. Standard Chartered is excluded (no UK retail book; excluded from
+modelling). Two caveats carried in the row notes: Lloyds IFRS 9 years are on
+the statutory basis (matching FY2018); Nationwide FY2025 consolidates the
+acquired Virgin Money (year-end also moved to 31 March), so it is not
+like-for-like with prior Nationwide-only years.
+
+### Checked and not usable
+
+- BoE stress-test results annexes: bank-specific *impairment charge* rates only
+  (already ingested); no starting-point coverage table was found (not confirmed
+  by direct read).
+- BoE Bankstats, EBA Risk Dashboard, UK Finance statistics: aggregate only, no
+  per-firm series; the EBA dashboard also drops UK banks from 2021.
 
 ## TBD — origin not confirmed
 

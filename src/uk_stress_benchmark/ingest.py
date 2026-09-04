@@ -1,6 +1,6 @@
 """End-to-end ingest: rebuild ``processed_inputs/`` from ``raw_inputs/``.
 
-This is the project's "build" entrypoint for data. It runs four ingest steps
+This is the project's "build" entrypoint for data. It runs five ingest steps
 in order:
 
 1. :mod:`uk_stress_benchmark.sync_sources` — download any raw files declared
@@ -14,6 +14,9 @@ in order:
 4. :mod:`uk_stress_benchmark.aggregate_firm_results` — consolidate the
    per-table impairment-charge CSVs from step 2 into a single tidy
    ``firm_results.csv`` (one row per firm × ACS year, decimal-encoded).
+5. :mod:`uk_stress_benchmark.extract_provisions` — flatten the EBA EU-wide
+   Transparency Exercise credit-risk CSVs into an annual per-firm
+   provision-coverage panel, ``firm_provisions_annual.csv``.
 
 All steps are idempotent, so re-running ``uv run ingest`` after a fresh
 clone (with raw_inputs/ empty) reproduces the full processed dataset.
@@ -24,6 +27,7 @@ from __future__ import annotations
 from uk_stress_benchmark import (
     aggregate_firm_results,
     extract_appendix_tables,
+    extract_provisions,
     extract_scenarios,
     sync_sources,
 )
@@ -41,6 +45,9 @@ def main() -> None:
     print()
     print("== aggregate-firm-results ==")
     aggregate_firm_results.main()
+    print()
+    print("== extract-provisions ==")
+    extract_provisions.main()
 
 
 if __name__ == "__main__":

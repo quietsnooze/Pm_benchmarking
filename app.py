@@ -271,12 +271,32 @@ def _card_head(step: str, eyebrow: str, title: str, sub: str | None = None) -> N
 # ----------------------------- data plumbing -------------------------------
 
 
+def _provisions_path() -> Path:
+    """Always use the static 2019 snapshot in ``firm_provisions.csv``.
+
+    ``firm_provisions_annual.csv`` (built by ``uv run extract-provisions``
+    from EBA transparency-exercise data, see SOURCES.md) carries commercial
+    coverage only — IRB banks report retail exposure in one aggregate class,
+    so mortgage and unsecured-retail coverage cannot be separated from it
+    and come back NaN. Switching the app to that file wholesale would strip
+    the mortgage/retail predictors, so it stays a committed data asset that
+    isn't wired into the model yet. Wiring its commercial column in as a
+    per-year overlay on top of the static file is a planned follow-up.
+    """
+    return PROCESSED / "firm_provisions.csv"
+
+
 @st.cache_data(show_spinner="Loading firm results / provisions…")
 def _load_firm_data() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    results = load_results(PROCESSED / "firm_results.csv")
+    # valid_firms makes a firm-name spelling drift between the results and
+    # provisions files fail loudly instead of silently dropping the firm in
+    # the inner join downstream.
+    known = set(results["firm_name"])
     return (
-        load_results(PROCESSED / "firm_results.csv"),
-        load_provisions(PROCESSED / "firm_provisions.csv"),
-        load_btl(PROCESSED / "firm_btl.csv"),
+        results,
+        load_provisions(_provisions_path(), valid_firms=known),
+        load_btl(PROCESSED / "firm_btl.csv", valid_firms=known),
     )
 
 
@@ -367,7 +387,14 @@ year_lo, year_hi = int(_acsyears.min()), int(_acsyears.max())
 # controls column and the results column can be written in one pass.
 published_years = _published_years()
 recent_years, recent_models = _fit_recent_models()
-firms_df = modelling_df.drop_duplicates("firm_name").reset_index(drop=True)
+# With a per-year provisions panel, a firm has one row per acsyear; keep
+# its most recent year's coverage rather than drop_duplicates' default
+# first-row (oldest) pick.
+firms_df = (
+    modelling_df.sort_values("acsyear")
+    .drop_duplicates("firm_name", keep="last")
+    .reset_index(drop=True)
+)
 
 # --- Hero band --------------------------------------------------------------
 

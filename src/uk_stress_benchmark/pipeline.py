@@ -2,10 +2,11 @@
 
 This is where the pieces come together: ``firm_results`` (one row per firm
 x acsyear) is inner-joined to the per-acsyear low-point shocks and the
-per-firm provision-coverage frame, firm-name dummies are added, and a
-universal exclude list (Standard Chartered by default — non-UK retail
-book) is applied. The result is the regression dataset the legacy R
-called ``st_modelling_df``.
+provision-coverage frame (joined on firm name alone if it's a static
+per-firm figure, or on firm name + acsyear if it's an annual panel),
+firm-name dummies are added, and a universal exclude list (Standard
+Chartered by default — non-UK retail book) is applied. The result is the
+regression dataset the legacy R called ``st_modelling_df``.
 
 On top of that, the four product recipes (mortgage / retail / CRE /
 business) are encoded as :class:`ProductRecipe` constants in
@@ -62,7 +63,12 @@ def build_modelling_dataset(
         per-variable ``_pct_fall`` / ``_pct_rise`` features.
     provisions : pd.DataFrame
         Output of :func:`uk_stress_benchmark.provisions.load_provisions`.
-        One row per firm, with the three ``*_prov_coverage`` columns.
+        Either one row per firm (a static coverage figure, joined on
+        ``firm_name`` and broadcast across every year) or, when the frame
+        carries an ``acsyear`` column, one row per (firm, acsyear) — an
+        annual panel joined on ``["firm_name", "acsyear"]`` so each
+        firm-year gets its own coverage figures. Either shape carries the
+        three ``*_prov_coverage`` columns.
     btl : pd.DataFrame | None, default ``None``
         Output of :func:`uk_stress_benchmark.provisions.load_btl` — one row
         per firm with a ``btl_share`` column (buy-to-let proportion of the
@@ -90,7 +96,8 @@ def build_modelling_dataset(
         shocks = shocks.reset_index()
 
     df = results.merge(shocks, on="acsyear", how="inner")
-    df = df.merge(provisions, on="firm_name", how="inner")
+    provision_keys = ["firm_name", "acsyear"] if "acsyear" in provisions.columns else ["firm_name"]
+    df = df.merge(provisions, on=provision_keys, how="inner")
 
     excludes_lower = {f.lower() for f in exclude_firms}
     df = df.loc[~df["firm_name"].str.lower().isin(excludes_lower)].reset_index(drop=True)
