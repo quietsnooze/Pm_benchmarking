@@ -291,6 +291,25 @@ the EBA figures. Add rows to `firm_provisions_annual.csv` by hand; an extra
 | Santander UK | Credit risk → Retail Banking / Corporate & Commercial Banking loss allowance and NPL coverage | Entity changed to Santander UK Group Holdings plc from 2016 |
 | Standard Chartered | "Loans and advances by client segment" with stage 3 cover ratio | Book is Asia/Africa/ME; excluded from modelling anyway |
 
+Document URLs verified and used during transcription (corrections/additions to
+the table below, downloaded directly):
+
+- Barclays FY2018/FY2021 UK product split comes from the ring-fenced **Barclays
+  Bank UK PLC** ARAs (the group AR URL served Barclays Bank PLC — wrong entity):
+  [BBUK 2018](https://home.barclays/content/dam/home-barclays/documents/investor-relations/reports-and-events/annual-reports/2018/2018-barclays-bank-uk-plc-annual-report.pdf),
+  [BBUK 2021](https://home.barclays/content/dam/home-barclays/documents/investor-relations/reports-and-events/annual-reports/2021/Barclays-Bank-UK-PLC-2021-Annual-Report.pdf).
+- Barclays FY2017 IAS 39 group AR (full, not the transition note):
+  <https://home.barclays/content/dam/home-barclays/documents/investor-relations/annualreports/ar2017/Barclays%20PLC%20Annual%20Report%202017.pdf>.
+- HSBC UK product split comes from the UK subsidiaries (group ARA is regional):
+  HSBC Bank plc 2015 (FY2015) and **HSBC UK Bank plc** 2018/2021 (FY2018/FY2021),
+  all in GBP not USD.
+- Santander UK FY2017 operating-company AR (the catalogued FY2017 entry is only
+  an announcement page):
+  <https://www.santander.co.uk/assets/s3fs-public/documents/santander_uk_plc_2017_annual_report_opco.pdf>.
+- RBS/NatWest FY2021 group figures from the NatWest Group ARA 2021; the group
+  ARAs for the IAS 39 years and 2019 ACS are still to be sourced (catalogued
+  URLs resolved to ring-fenced RBS plc / RBS N.V., not the group).
+
 Document URLs seen verbatim in search results (unverified by direct download):
 
 | Firm | FY2013 | FY2014 | FY2015 | FY2016 | FY2017 | FY2018 | FY2021 | FY2024 |
@@ -343,9 +362,17 @@ plausible band (mortgage ~0.05–0.6%, unsecured ~3–12%). Raw figures are
 mirrored, with source/unit/period/definition, in
 [appendix-detailed-data.md](appendix-detailed-data.md).
 
-**Progress.** Being filled one firm-year at a time (resumable). Done so far:
-Lloyds FY2018 (2019 ACS). Standard Chartered is excluded (no UK retail book;
-excluded from modelling).
+**Progress.** Being filled one firm-year at a time (resumable). Populated
+(ACS years): Lloyds 2016–2019, Nationwide 2016–2019 + 2022, Santander UK
+2016–2019 + 2022, Barclays 2019 + 2022 (ring-fenced Barclays Bank UK PLC),
+HSBC 2016 (HSBC Bank plc) + 2019 + 2022 (HSBC UK Bank plc), RBS/NatWest 2022
+(NatWest Group). Documented gaps: Barclays and HSBC IAS 39 years (2017/2018
+ACS) disclose UK gross by product but the impairment allowance only group-wide
+by asset class or by region, so a UK product-coverage ratio can't be computed.
+Standard Chartered is excluded (no UK retail book; excluded from modelling).
+Still open: RBS/NatWest group figures for the IAS 39 years and 2019 ACS (the
+catalogued URLs resolved to ring-fenced/overseas sub entities, not the group)
+and the Phase-2 years (2014, 2015, 2025).
 
 ### Checked and not usable
 

@@ -58,14 +58,21 @@ REQUIRED_COLUMNS: tuple[str, ...] = (
 _VALID_PRODUCTS: frozenset[str] = frozenset({"mortgage", "unsecured_retail"})
 _VALID_BASES: frozenset[str] = frozenset({"IAS39", "IFRS9"})
 
-# Plausible coverage band per product (allowance / gross loans, as a ratio).
-# Wider than any single year's spread on purpose: the point is to catch a
-# transcription off by an order of magnitude or a numerator/denominator swap,
-# not to police normal variation. Sourced from the task's sanity ranges
-# (mortgage ~0.05-0.6%, unsecured ~3-12%).
-_SANE_BANDS: dict[str, tuple[float, float]] = {
-    "mortgage": (0.0005, 0.006),
-    "unsecured_retail": (0.03, 0.12),
+# Plausible coverage band per (basis, product) — allowance / gross loans as a
+# ratio. Wider than any single year's spread on purpose: the point is to catch
+# a transcription off by an order of magnitude or a numerator/denominator swap,
+# not to police normal variation. The IFRS 9 bands are the task's sanity
+# ranges (mortgage ~0.05-0.6%, unsecured ~3-12%); the IAS 39 (incurred-loss)
+# bands run lower, because incurred-loss provisions are structurally smaller
+# than IFRS 9 expected-credit-loss allowances — an IAS 39 unsecured book near
+# 1.5% is normal, not an outlier.
+_SANE_BANDS: dict[tuple[str, str], tuple[float, float]] = {
+    ("IFRS9", "mortgage"): (0.0005, 0.006),
+    # floor 2.5% not 3%: a prime UK unsecured book (e.g. HSBC UK) sits just
+    # under 3% ECL coverage — real, not an error to flag.
+    ("IFRS9", "unsecured_retail"): (0.025, 0.12),
+    ("IAS39", "mortgage"): (0.0002, 0.006),
+    ("IAS39", "unsecured_retail"): (0.008, 0.10),
 }
 
 # coverage recomputed from allowance/gross must match any hand-entered
@@ -161,15 +168,16 @@ def check_sanity(panel: pd.DataFrame) -> list[str]:
     flags: list[str] = []
     for _, row in panel.iterrows():
         product = str(row["product"]).strip()
+        basis = str(row["basis"]).strip()
         coverage = row["coverage"]
-        band = _SANE_BANDS.get(product)
+        band = _SANE_BANDS.get((basis, product))
         if band is None or bool(pd.isna(coverage)):
             continue
         low, high = band
         if not (low <= coverage <= high):
             flags.append(
-                f"{row['firm_name']} {row['acsyear']} {product}: coverage {coverage:.4%} "
-                f"outside plausible band {low:.2%}-{high:.2%} — verify or note"
+                f"{row['firm_name']} {row['acsyear']} {product} ({basis}): coverage "
+                f"{coverage:.4%} outside plausible band {low:.2%}-{high:.2%} — verify or note"
             )
     return flags
 

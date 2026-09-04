@@ -170,6 +170,23 @@ def test_check_sanity_flags_out_of_range_unsecured_coverage(tmp_path: Path):
     assert any("unsecured_retail" in f for f in flags)
 
 
+def test_check_sanity_bands_are_basis_aware(tmp_path: Path):
+    # ~1.75% unsecured coverage is normal under IAS 39 (incurred loss) but an
+    # order of magnitude light under IFRS 9 (expected credit loss). The same
+    # ratio must flag under IFRS 9 and pass under IAS 39.
+    ias39 = _write(
+        tmp_path / "ias39.csv",
+        [_row(product="unsecured_retail", allowance="487", gross_loans="27739", basis="IAS39")],
+    )
+    ifrs9 = _write(
+        tmp_path / "ifrs9.csv",
+        [_row(product="unsecured_retail", allowance="487", gross_loans="27739", basis="IFRS9")],
+    )
+
+    assert check_sanity(load_annual_reports(ias39)) == []
+    assert any("unsecured_retail" in f for f in check_sanity(load_annual_reports(ifrs9)))
+
+
 def test_check_sanity_silent_on_in_range_values(tmp_path: Path):
     csv = _write(
         tmp_path / "ar.csv",

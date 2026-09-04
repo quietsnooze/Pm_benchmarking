@@ -2,63 +2,188 @@
 
 Raw figures behind the processed datasets, captured with source, unit, period
 and definition so every derived number can be re-checked against the primary
-document. Amounts are as printed in the source (currency and unit stated per
-block). This appendix is committed; the source PDFs live in `raw_inputs/`
-(gitignored, reproducible from the URLs in [SOURCES.md](SOURCES.md)).
+document. This appendix is committed; the source PDFs live in `raw_inputs/`
+(gitignored, reproducible from the URLs in [SOURCES.md](SOURCES.md) and in the
+`source_url` column of each CSV).
 
 ---
 
 ## Mortgage & unsecured-retail provision coverage (annual reports)
 
 Feeds `processed_inputs/firm_provisions_annual_reports.csv`. **Coverage =
-impairment allowance (balance-sheet stock) ÷ gross loans, per product**, at
-the test's start point (31 December of the year before the ACS; Nationwide
-uses its nearest 4 April year-end). Numerator and denominator are captured
-separately so the ratio is re-derivable.
+impairment allowance (balance-sheet stock) / gross loans, per product**, at the
+test's start point (31 December of the year before the ACS; Nationwide uses its
+nearest 4 April year-end). Numerator (`allowance`) and denominator
+(`gross_loans`) are captured separately so the ratio is re-derivable; coverage
+is computed in code, never hand-typed.
 
-Product definitions (applied consistently):
+Definitions applied consistently:
 
 - **mortgage** — UK residential mortgages.
 - **unsecured_retail** — credit cards + personal loans + overdrafts (excludes
-  auto/motor and any secured lending).
-- Commercial is out of scope here (sourced from the EBA file; see SOURCES.md).
+  auto/motor and any secured lending). Commercial is out of scope here (sourced
+  from the EBA file; see SOURCES.md).
+- **basis** — IAS 39 (incurred loss) for FY2017 and earlier; IFRS 9 (expected
+  credit loss) from FY2018. The two are **not comparable across the 1 Jan 2018
+  transition**: IFRS 9 ECL allowances are structurally larger than IAS 39
+  incurred-loss provisions, most visibly on unsecured books (e.g. Lloyds
+  unsecured roughly doubles, 1.8% -> 3.5%, across the break).
+- **entity** — group level to match the rest of the dataset, except where only
+  a ring-fenced UK sub discloses the UK product split (Barclays Bank UK PLC from
+  2018; HSBC UK Bank plc from 2018), recorded in the `entity` column.
+- A firm-year with no usable mortgage/unsecured split is left blank with an
+  explaining note (a documented gap), never guessed.
 
-Accounting basis: **IAS 39** (incurred loss) for FY2017 and earlier;
-**IFRS 9** (expected credit loss) from FY2018. The two are not comparable
-across the 1 Jan 2018 transition — every IAS 39 → IFRS 9 step is flagged.
+All amounts are £m unless the currency column says otherwise. `acsyear` is the
+stress-test year; the balance-sheet date is 31 December of the prior year
+(Nationwide: the stated 4 April year-end).
 
-Entity: group level, to match the rest of the dataset, except where only a
-ring-fenced UK sub (e.g. HSBC UK Bank plc, Barclays Bank UK PLC, both from
-2018) discloses the UK product split — then the sub is used and named in the
-`entity` column.
+
+### Barclays
+
+| ACS | Basis | Entity | Product | Allowance | Gross | Coverage | Source table | Page |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 2017 | IAS39 | Barclays PLC (group segment) | mortgage | — | — | gap | Home loans / Credit cards principal portfolios (gross only) | FY2016 AR, PDF p176-p186 |
+| 2017 | IAS39 | Barclays PLC (group segment) | unsecured_retail | — | — | gap | Credit cards / unsecured loans principal portfolios (gross only) | FY2016 AR, PDF p177-p186 |
+| 2018 | IAS39 | Barclays PLC (group segment) | mortgage | — | — | gap | Home loans / Credit cards principal portfolios (gross only) | FY2017 AR, PDF p148-p156 |
+| 2018 | IAS39 | Barclays PLC (group segment) | unsecured_retail | — | — | gap | Credit cards / unsecured loans principal portfolios (gross only) | FY2017 AR, PDF p149-p156 |
+| 2019 | IFRS9 | Barclays Bank UK PLC | mortgage | 84 | 137,208 | 0.0612% | Loans and advances at amortised cost by product - Barclays Bank UK Group (audited): Home loans | printed p53 (PDF p55), 2018 Barclays Bank UK PLC AR |
+| 2019 | IFRS9 | Barclays Bank UK PLC | unsecured_retail | 2,582 | 25,208 | 10.2428% | Loans and advances at amortised cost by product - Barclays Bank UK Group (audited): Credit cards, unsecured loans and other retail lending | printed p53 (PDF p55), 2018 Barclays Bank UK PLC AR |
+| 2022 | IFRS9 | Barclays Bank UK PLC | mortgage | 89 | 158,309 | 0.0562% | Loans and advances at amortised cost by product - Barclays Bank UK Group (audited): Home loans | printed p66 (PDF p67), 2021 Barclays Bank UK PLC AR |
+| 2022 | IFRS9 | Barclays Bank UK PLC | unsecured_retail | 1,664 | 15,089 | 11.0279% | Loans and advances at amortised cost by product - Barclays Bank UK Group (audited): Credit cards, unsecured loans and other retail lending | printed p66 (PDF p67), 2021 Barclays Bank UK PLC AR |
+
+Notes:
+
+- **2017 mortgage** — GAP: IAS 39 discloses UK gross by product (Barclays UK home loans 129,136m; UK cards 17,833 + UK personal loans 6,076) but impairment allowance only group-wide by asset class (home loans 467m incl. non-UK), never UK x product. UK coverage not computable.
+- **2017 unsecured_retail** — GAP: UK unsecured gross partly available (cards+personal loans) but allowance only group-wide by asset class (cards/unsecured 3,060m incl. US cards, Partner Finance motor). Not computable.
+- **2018 mortgage** — GAP: as FY2016 — UK gross by product available (home loans 132,132m) but allowance only group-wide by asset class (home loans 458m incl. non-UK). UK coverage not computable.
+- **2018 unsecured_retail** — GAP: as FY2016 — allowance only group-wide by asset class (cards/unsecured 3,055m). UK unsecured coverage not computable.
+- **2019 mortgage** — Home loans = UK residential mortgages. Ring-fenced Barclays Bank UK PLC (the catalogued group AR URL served Barclays Bank PLC, whose home loans are only 13.5bn - wrong entity). IFRS 9 ECL, all stages (Total column).
+- **2019 unsecured_retail** — 'Credit cards, unsecured loans and other retail lending' = UK cards + personal loans + overdrafts + other unsecured; no motor/auto in the ring-fenced bank. IFRS 9 ECL, all stages.
+- **2022 mortgage** — Home loans = UK residential mortgages. Ring-fenced Barclays Bank UK PLC (catalogued FY2021 link was a Q1-2021 Pillar 3 - wrong period). IFRS 9 ECL, all stages.
+- **2022 unsecured_retail** — Unsecured = cards + personal loans + overdrafts + other; no motor. IFRS 9 ECL, all stages.
+
+### HSBC
+
+| ACS | Basis | Entity | Product | Allowance | Gross | Coverage | Source table | Page |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 2016 | IAS39 | HSBC Bank plc (UK) | mortgage | 117 | 79,173 | 0.1478% | Total personal lending (UK column): Residential mortgage lending | printed p42 (PDF p44), 2015 HSBC Bank plc ARA |
+| 2016 | IAS39 | HSBC Bank plc (UK) | unsecured_retail | 199 | 14,032 | 1.4182% | Total personal lending (UK column): Other personal lending | printed p42 (PDF p44), 2015 HSBC Bank plc ARA |
+| 2017 | IAS39 | HSBC Holdings group | mortgage | — | — | gap | Total personal lending (regional, not UK) | 2016 group ARA |
+| 2017 | IAS39 | HSBC Holdings group | unsecured_retail | — | — | gap | Total personal lending (regional, not UK) | 2016 group ARA |
+| 2018 | IAS39 | HSBC Holdings group (Pillar 3) | mortgage | — | — | gap | Pillar 3 (regulatory exposure classes, no UK product loans/allowance table) | 2017 Pillar 3 |
+| 2018 | IAS39 | HSBC Holdings group (Pillar 3) | unsecured_retail | — | — | gap | Pillar 3 (regulatory exposure classes) | 2017 Pillar 3 |
+| 2019 | IFRS9 | HSBC UK Bank plc | mortgage | 107 | 94,703 | 0.1130% | Total personal lending by stage distribution: First lien residential mortgages | printed p40 (PDF p42), 2018 HSBC UK Bank plc ARA |
+| 2019 | IFRS9 | HSBC UK Bank plc | unsecured_retail | 458 | 15,505 | 2.9539% | Total personal lending by stage distribution: Other personal lending | printed p40 (PDF p42), 2018 HSBC UK Bank plc ARA |
+| 2022 | IFRS9 | HSBC UK Bank plc | mortgage | 163 | 118,077 | 0.1380% | Total personal lending by stage distribution: First lien residential mortgages | printed p47 (PDF p49), 2021 HSBC UK Bank plc ARA |
+| 2022 | IFRS9 | HSBC UK Bank plc | unsecured_retail | 604 | 13,241 | 4.5616% | Total personal lending by stage distribution: Other personal lending | printed p47 (PDF p49), 2021 HSBC UK Bank plc ARA |
+
+Notes:
+
+- **2016 mortgage** — UK residential mortgages, UK column. HSBC Bank plc reports in GBP. IAS 39 allowance stock.
+- **2016 unsecured_retail** — Other personal lending (UK) = personal loans & overdrafts (7,073/147) + credit cards (6,959/52); motor is nil in the UK column, so nothing to exclude. IAS 39.
+- **2017 mortgage** — GAP: group ARA splits personal lending by region (Europe/Asia/...), not UK; 'Europe' is broader than the UK. UK split would need the HSBC Bank plc 2016 subsidiary ARA (not catalogued; mirror URL 404s).
+- **2017 unsecured_retail** — GAP: regional split only (Europe != UK). See HSBC 2017 mortgage note.
+- **2018 mortgage** — GAP: FY2017 Pillar 3 is Basel EAD/RWA by exposure class, no IAS 39 UK-product gross+allowance. UK split would need the HSBC Bank plc 2017 subsidiary ARA (not catalogued).
+- **2018 unsecured_retail** — GAP: see HSBC 2018 mortgage note.
+- **2019 mortgage** — First lien UK residential mortgages, ring-fenced HSBC UK Bank plc (first exists FY2018). IFRS 9 ECL, all stages. Entity scope differs from FY2015 HSBC Bank plc (UK column).
+- **2019 unsecured_retail** — Other personal lending = 'other' (personal loans & overdrafts 8,226/218) + credit cards (7,279/240); no motor line in the UK ring-fenced bank. IFRS 9 ECL, all stages.
+- **2022 mortgage** — First lien UK residential mortgages. IFRS 9 ECL, all stages.
+- **2022 unsecured_retail** — Other personal lending = 'other' (7,222/285) + credit cards (6,019/319); no motor. IFRS 9 ECL.
 
 ### Lloyds Banking Group
 
-**FY2018 → 2019 ACS** (balance-sheet date 31 December 2018). Basis: IFRS 9.
-Entity: Lloyds Banking Group (group). Currency: GBP millions.
-Source: [LBG Annual Report 2018](https://www.lloydsbankinggroup.com/assets/pdfs/investors/annual-report/2018-download-links/2018_lbg_annual_report.pdf),
-Risk management — Retail credit risk, **underlying basis**.
-
-Underlying basis is used because it carries the per-segment gross lending
-(Table 1.10a) and per-segment ECL allowance (Table 1.11a) on the same IFRS 9
-footing, so coverage is exactly re-derivable and matches Lloyds' own printed
-ratios; it also strips the HBOS/MBNA acquisition-accounting distortions
-(purchased-or-originated-credit-impaired assets) that make the statutory
-figures hard to compare year on year. The statutory-basis allowances are
-noted alongside for reference.
-
-| Product | Segment (report label) | Gross lending £m | ECL allowance £m | Coverage | Source |
-| --- | --- | --- | --- | --- | --- |
-| mortgage | Secured | 289,237 | 1,462 | 0.5055% | Table 1.10a (gross, p124) / Table 1.11a (allowance, p126) |
-| unsecured_retail | Unsecured | 27,990 | 980 | 3.5013% | Table 1.10a (gross, p124) / Table 1.11a (allowance, p126) |
+| ACS | Basis | Entity | Product | Allowance | Gross | Coverage | Source table | Page |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 2016 | IAS39 | Lloyds Banking Group | mortgage | 1,431 | 302,413 | 0.4732% | Table 1.10 Retail impaired loans and provisions (Secured) | PDF p132 (2015 ARA) |
+| 2016 | IAS39 | Lloyds Banking Group | unsecured_retail | 350 | 19,342 | 1.8095% | Table 1.10 (Loans & overdrafts 197/9,917) + Table 1.26 Consumer Finance (Credit Cards 153/9,425) | PDF p132 & p139 (2015 ARA) |
+| 2017 | IAS39 | Lloyds Banking Group | mortgage | 1,503 | 294,503 | 0.5104% | Table 1.9 Retail impaired loans and provisions (Secured) | PDF p136 (2016 ARA) |
+| 2017 | IAS39 | Lloyds Banking Group | unsecured_retail | 339 | 19,562 | 1.7330% | Table 1.9 (Overdrafts 90/1,952) + Table 1.24 Consumer Finance (Credit cards 157/9,843, Loans 92/7,767) | PDF p136 & p144 (2016 ARA) |
+| 2018 | IAS39 | Lloyds Banking Group | mortgage | 1,443 | 292,187 | 0.4939% | Table 1.9: Retail impaired loans and provisions | p123 (PDF p125) |
+| 2018 | IAS39 | Lloyds Banking Group | unsecured_retail | 487 | 27,739 | 1.7557% | Table 1.9: Retail impaired loans and provisions | p123 (PDF p125) |
+| 2019 | IFRS9 | Lloyds Banking Group | mortgage | 1,462 | 289,237 | 0.5055% | Retail, underlying basis: Table 1.10a (gross lending) & Table 1.11a (ECL allowances) | p124 (gross), p126 (allowance) |
+| 2019 | IFRS9 | Lloyds Banking Group | unsecured_retail | 980 | 27,990 | 3.5013% | Retail, underlying basis: Table 1.10a (gross lending) & Table 1.11a (ECL allowances) | p124 (gross), p126 (allowance) |
 
 Notes:
-- "Secured" (Retail division) is UK residential mortgages; reproduces Lloyds'
-  printed coverage of 0.5%.
-- "Unsecured" is *Credit cards, Loans and Overdrafts* (report footnote 2) —
-  matches the unsecured-retail definition exactly; UK Motor Finance is a
-  separate segment and is excluded. Reproduces printed coverage of 3.5%.
-- Statutory-basis ECL allowances (Table 1.11, p126) for reference: Secured
-  £460m, Unsecured £896m.
-- Cross-check: the static FY2019-vintage snapshot `firm_provisions.csv` has
-  Lloyds mortgage 0.4% and retail 3.8% — same order of magnitude.
+
+- **2016 mortgage** — Secured = UK residential mortgages. IAS 39 total impairment provisions / gross.
+- **2016 unsecured_retail** — Unsecured = Credit cards + personal loans + overdrafts (allowance 350m, gross 19,342m). Excludes Asset/Motor Finance (UK+Europe), Wealth, Retail Business Banking. IAS 39.
+- **2017 mortgage** — Secured = UK residential mortgages. IAS 39 total impairment provisions / gross.
+- **2017 unsecured_retail** — Unsecured = Credit cards + Loans + Overdrafts (allowance 339m, gross 19,562m). Excludes UK Motor Finance, Europe, Wealth, Retail Business Banking. IAS 39.
+- **2018 mortgage** — Secured = UK residential mortgages. IAS 39 total impairment provisions (incl. collective unidentified) / gross loans and advances. Lloyds' own printed metric is provisions/impaired-loans = 37.1%.
+- **2018 unsecured_retail** — Unsecured = Credit cards (267/18,134) + Loans (107/8,010) + Overdrafts (113/1,595); allowance 487m, gross 27,739m. Excludes UK Motor Finance, Retail Business Banking, Europe. IAS 39 incurred-loss basis (runs below the IFRS 9 unsecured band by design).
+- **2019 mortgage** — Secured = UK residential mortgages (Retail division). Underlying basis (excludes HBOS/MBNA acquisition adjustments); reproduces Lloyds' printed 0.5%. Statutory-basis allowance was GBP460m (Table 1.11).
+- **2019 unsecured_retail** — Unsecured = Credit cards, Loans and Overdrafts (report footnote 2); UK Motor Finance excluded (separate segment). Underlying basis; reproduces printed 3.5%. Statutory-basis allowance was GBP896m (Table 1.11).
+
+### Nationwide
+
+| ACS | Basis | Entity | Product | Allowance | Gross | Coverage | Source table | Page |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 2016 | IAS39 | Nationwide Building Society | mortgage | 102 | 162,164 | 0.0629% | Maximum exposure to lending risk (Business and Risk Report) | p112 (PDF p113), FYE 4 Apr 2016 |
+| 2016 | IAS39 | Nationwide Building Society | unsecured_retail | 281 | 3,869 | 7.2629% | Maximum exposure to lending risk (Business and Risk Report) | p112 (PDF p113), FYE 4 Apr 2016 |
+| 2017 | IAS39 | Nationwide Building Society | mortgage | 144 | 171,263 | 0.0841% | Maximum exposure to credit risk — 2017 comparative column (Business and Risk Report) | p106 (PDF p107), FYE 4 Apr 2017 comparative in the 2018 ARA |
+| 2017 | IAS39 | Nationwide Building Society | unsecured_retail | 269 | 3,949 | 6.8119% | Maximum exposure to credit risk — 2017 comparative column (Business and Risk Report) | p106 (PDF p107), FYE 4 Apr 2017 comparative in the 2018 ARA |
+| 2018 | IAS39 | Nationwide Building Society | mortgage | 145 | 177,299 | 0.0818% | Maximum exposure to credit risk (Business and Risk Report) | p106 (PDF p107), FYE 4 Apr 2018 |
+| 2018 | IAS39 | Nationwide Building Society | unsecured_retail | 298 | 4,107 | 7.2559% | Maximum exposure to credit risk (Business and Risk Report) | p106 (PDF p107), FYE 4 Apr 2018 |
+| 2019 | IFRS9 | Nationwide Building Society | mortgage | 206 | 185,940 | 0.1108% | Maximum exposure to credit risk — amortised cost (Business and Risk Report) | p108 (PDF p109), FYE 4 Apr 2019 |
+| 2019 | IFRS9 | Nationwide Building Society | unsecured_retail | 418 | 4,586 | 9.1147% | Maximum exposure to credit risk — amortised cost (Business and Risk Report) | p108 (PDF p109), FYE 4 Apr 2019 |
+| 2022 | IFRS9 | Nationwide Building Society | mortgage | 187 | 198,056 | 0.0944% | Maximum exposure to credit risk — amortised cost (Business and Risk Report) | p142 (PDF p143), FYE 4 Apr 2022 |
+| 2022 | IFRS9 | Nationwide Building Society | unsecured_retail | 529 | 4,638 | 11.4058% | Maximum exposure to credit risk — amortised cost (Business and Risk Report) | p142 (PDF p143), FYE 4 Apr 2022 |
+
+Notes:
+
+- **2016 mortgage** — Residential mortgages. Consumer banking = unsecured lending (current-account overdrafts, personal loans, credit cards); Nationwide has no motor book. Allowance = balance-sheet impairment provision stock. Year-end 4 April (nearest to the ACS start point).
+- **2016 unsecured_retail** — Consumer banking = unsecured lending (current-account overdrafts, personal loans, credit cards); Nationwide has no motor book. Allowance = balance-sheet impairment provision stock. Year-end 4 April (nearest to the ACS start point).
+- **2017 mortgage** — Residential mortgages; 4 Apr 2017 taken from the 2018 ARA's prior-year comparative column (standalone 2017 ARA not catalogued). Consumer banking = unsecured lending (current-account overdrafts, personal loans, credit cards); Nationwide has no motor book. Allowance = balance-sheet impairment provision stock. Year-end 4 April (nearest to the ACS start point).
+- **2017 unsecured_retail** — 4 Apr 2017 from the 2018 ARA comparative column. Consumer banking = unsecured lending (current-account overdrafts, personal loans, credit cards); Nationwide has no motor book. Allowance = balance-sheet impairment provision stock. Year-end 4 April (nearest to the ACS start point).
+- **2018 mortgage** — Residential mortgages; last IAS 39 year (IFRS 9 adopted 5 Apr 2018). Consumer banking = unsecured lending (current-account overdrafts, personal loans, credit cards); Nationwide has no motor book. Allowance = balance-sheet impairment provision stock. Year-end 4 April (nearest to the ACS start point).
+- **2018 unsecured_retail** — Last IAS 39 year. Consumer banking = unsecured lending (current-account overdrafts, personal loans, credit cards); Nationwide has no motor book. Allowance = balance-sheet impairment provision stock. Year-end 4 April (nearest to the ACS start point).
+- **2019 mortgage** — Residential mortgages, amortised cost; first IFRS 9 year. A small FVTPL mortgage line (GBP72m, no impairment) is excluded. Consumer banking = unsecured lending (current-account overdrafts, personal loans, credit cards); Nationwide has no motor book. Allowance = balance-sheet impairment provision stock. Year-end 4 April (nearest to the ACS start point).
+- **2019 unsecured_retail** — First IFRS 9 year (ECL, all stages). Consumer banking = unsecured lending (current-account overdrafts, personal loans, credit cards); Nationwide has no motor book. Allowance = balance-sheet impairment provision stock. Year-end 4 April (nearest to the ACS start point).
+- **2022 mortgage** — Residential mortgages, amortised cost. A small FVTPL mortgage line (GBP64m, no impairment) is excluded. Consumer banking = unsecured lending (current-account overdrafts, personal loans, credit cards); Nationwide has no motor book. Allowance = balance-sheet impairment provision stock. Year-end 4 April (nearest to the ACS start point).
+- **2022 unsecured_retail** — IFRS 9 ECL, all stages. Consumer banking = unsecured lending (current-account overdrafts, personal loans, credit cards); Nationwide has no motor book. Allowance = balance-sheet impairment provision stock. Year-end 4 April (nearest to the ACS start point).
+
+### Santander UK
+
+| ACS | Basis | Entity | Product | Allowance | Gross | Coverage | Source table | Page |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 2016 | IAS39 | Santander UK plc | mortgage | 424 | 152,819 | 0.2775% | Credit performance - mortgages (Impairment loan loss allowances) | printed p69 (PDF p71), 2015 AR |
+| 2016 | IAS39 | Santander UK plc | unsecured_retail | 188 | 5,571 | 3.3746% | Credit performance - vehicle/consumer & other unsecured finance | printed p76 (PDF p78), 2015 AR |
+| 2017 | IAS39 | Santander UK plc | mortgage | 279 | 154,274 | 0.1808% | Credit performance - mortgages | printed p59 (PDF p61), 2016 AR |
+| 2017 | IAS39 | Santander UK plc | unsecured_retail | 169 | 5,273 | 3.2050% | Credit performance - business banking, consumer finance & other unsecured | printed p65 (PDF p67), 2016 AR |
+| 2018 | IAS39 | Santander UK plc | mortgage | 225 | 154,944 | 0.1452% | Credit performance - mortgages | printed p82 (PDF p84), 2017 opco AR |
+| 2018 | IAS39 | Santander UK plc | unsecured_retail | 135 | 5,178 | 2.6072% | Credit performance - consumer (auto) finance & other unsecured (Total other unsecured) | printed p87 (PDF p89), 2017 opco AR |
+| 2019 | IFRS9 | Santander UK plc | mortgage | 234 | 157,957 | 0.1481% | Credit performance - mortgages (Loss allowances) | printed p79 (PDF p81), 2018 AR |
+| 2019 | IFRS9 | Santander UK plc | unsecured_retail | 220 | 5,640 | 3.9007% | Credit performance - consumer (auto) finance & other unsecured (Total other unsecured) | printed p83 (PDF p85), 2018 AR |
+| 2022 | IFRS9 | Santander UK Group Holdings plc | mortgage | 191 | 177,297 | 0.1077% | Credit performance (audited) - mortgages (Loss allowances) | printed p131 (PDF p133), 2021 AR |
+| 2022 | IFRS9 | Santander UK Group Holdings plc | unsecured_retail | 176 | 4,779 | 3.6828% | Credit performance (audited) - other unsecured (Total other unsecured) | printed p138 (PDF p140), 2021 AR |
+
+Notes:
+
+- **2016 mortgage** — Mortgage gross includes Social Housing loans and finance leases (footnote 2). IAS 39.
+- **2016 unsecured_retail** — Unsecured = Personal loans (60/2,201) + Credit cards (86/2,834) + Overdrafts (42/536) = 188/5,571. Vehicle/auto (136/6,290) and Business banking (14/150) excluded. IAS 39.
+- **2017 mortgage** — Mortgage gross incl. Social Housing/finance leases. IAS 39.
+- **2017 unsecured_retail** — Unsecured = Personal (55/2,229) + Credit cards (77/2,493) + Overdrafts (37/551) = 169/5,273. Consumer/auto (146/6,764) and Business banking (57/2,327) excluded. IAS 39.
+- **2018 mortgage** — Mortgage gross incl. Social Housing/finance leases. IAS 39. FY2017 opco AR located by search (not catalogued).
+- **2018 unsecured_retail** — Unsecured = printed 'Total other unsecured' = Personal (44/2,169) + Credit cards (62/2,444) + Overdrafts (29/565) = 135/5,178. Consumer (auto) finance (77/6,957) excluded. IAS 39.
+- **2019 mortgage** — IFRS 9 ECL, all stages, on+off balance sheet (per footnote; off-balance ~GBP3m). Mortgage gross incl. Social Housing/finance leases.
+- **2019 unsecured_retail** — Unsecured = 'Total other unsecured' = Personal (47/2,182) + Credit cards (112/2,865) + Overdrafts (61/593) = 220/5,640. Consumer (auto) finance (85/7,347) excluded. IFRS 9 ECL.
+- **2022 mortgage** — IFRS 9 ECL, all stages, on+off balance sheet. Entity = Santander UK Group Holdings plc (vs Santander UK plc opco used for 2016-2019 ACS).
+- **2022 unsecured_retail** — Unsecured = 'Total other unsecured' = Personal (47/2,000) + Credit cards (89/2,341) + Overdrafts (40/438) = 176/4,779. Business banking (22/3,532) excluded; consumer/auto is a separate table. IFRS 9 ECL.
+
+### The Royal Bank of Scotland Group
+
+| ACS | Basis | Entity | Product | Allowance | Gross | Coverage | Source table | Page |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 2022 | IFRS9 | NatWest Group plc | mortgage | 768 | 194,011 | 0.3959% | Sector analysis - portfolio summary (audited): Loans / ECL provisions by geography | printed p221 (PDF p112), 2021 ARA |
+| 2022 | IFRS9 | NatWest Group plc | unsecured_retail | 1,174 | 13,369 | 8.7815% | Sector analysis - portfolio summary (audited): Loans / ECL provisions by geography | printed p221 (PDF p112), 2021 ARA |
+
+Notes:
+
+- **2022 mortgage** — Mortgages. Gross = loans gross of ECL; allowance = total ECL provisions (Stages 1-3). NatWest Group consolidated.
+- **2022 unsecured_retail** — Unsecured = Credit cards (260/3,947) + Other personal (914/9,422); allowance 1,174m, gross 13,369m. 'Other personal' = unsecured personal loans/overdrafts; no motor line. IFRS 9.
+
+---
+
+*Cross-check:* the static FY2019-vintage snapshot `firm_provisions.csv` agrees to order of magnitude where it overlaps; Nationwide's 4 Apr 2019 figures (mortgage 0.111%, unsecured 9.11%) match it to the basis point.
+
