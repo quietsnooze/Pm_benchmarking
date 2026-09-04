@@ -23,7 +23,9 @@ zero value.
 
 EBA's column naming and exposure-class code list drifted only slightly
 across the 2018-2020 exercises (occasional case changes to ``LEI_Code``);
-pre-2018 exercises used numeric ``Item`` codes with no ``Label`` column at
+the 2018 and 2019 exercises also format ``Amount`` with comma thousands
+separators where the others use bare floats, which the parser strips.
+Pre-2018 exercises used numeric ``Item`` codes with no ``Label`` column at
 all and aren't supported here — ``extract_coverage`` raises a clear error
 naming the file rather than silently reading nonsense.
 
@@ -252,7 +254,14 @@ def extract_coverage(csv_path: Path | str, *, period: int, country: str = "GB") 
 
     relevant["Portfolio"] = pd.to_numeric(relevant["Portfolio"], errors="coerce")
     relevant["Exposure"] = pd.to_numeric(relevant["Exposure"], errors="coerce")
-    relevant["Amount"] = pd.to_numeric(relevant["Amount"], errors="coerce")
+    # The 2018 and 2019 exercises format Amount with comma thousands
+    # separators ("21,893.9301"); 2016/2017/2020 use bare floats. The decimal
+    # mark is always a period, so a comma is only ever a thousands separator —
+    # strip them, or pd.to_numeric coerces every value >= 1000 to NaN and the
+    # largest exposures silently vanish.
+    relevant["Amount"] = pd.to_numeric(
+        relevant["Amount"].str.replace(",", "", regex=False), errors="coerce"
+    )
     relevant["_code"] = list(zip(relevant["Portfolio"], relevant["Exposure"], strict=True))
 
     rows: list[dict[str, object]] = []

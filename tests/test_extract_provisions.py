@@ -38,7 +38,7 @@ def _row(
     country=30,
     exposure=406,
     status=0,
-    amount=0.0,
+    amount: float | str = 0.0,
     perf_status=0,
     nsa="EBA_GB_LLOYDS",
     item="",
@@ -87,6 +87,29 @@ def test_extract_coverage_computes_hand_checked_ratios(tmp_path: Path):
     # banks report retail in one aggregate exposure class) — always NaN.
     assert pd.isna(row["mort_prov_coverage"])
     assert pd.isna(row["retail_prov_coverage"])
+
+
+def test_extract_coverage_parses_thousands_separator_commas_in_amount(tmp_path: Path):
+    # The 2018 and 2019 EBA exercises format the Amount field with comma
+    # thousands separators (e.g. "21,893.9301"), while 2016/2017/2020 use
+    # bare floats. Without stripping the commas, pd.to_numeric coerces every
+    # value >= 1000 to NaN, so large exposures — and thus every firm's
+    # commercial coverage for those two years — silently vanish. The full
+    # value must be read.
+    rows = [
+        _row(label=_LABEL_EXPOSURE, portfolio=2, exposure=303, amount="1,234,567.89"),
+        _row(label=_LABEL_EXPOSURE, portfolio=1, exposure=303, amount="10,000.0"),
+        _row(label=_LABEL_PROVISIONS, portfolio=2, exposure=303, amount="12,345.67"),
+        _row(label=_LABEL_PROVISIONS, portfolio=1, exposure=303, amount="100.0"),
+    ]
+    csv_path = _write_csv(tmp_path / "tr_cre.csv", rows)
+
+    result = extract_coverage(csv_path, period=201812)
+
+    row = result.iloc[0]
+    assert row["commercial_prov_coverage"] == pytest.approx(
+        (12345.67 + 100.0) / (1234567.89 + 10000.0)
+    )
 
 
 def test_extract_coverage_ignores_irrelevant_rows(tmp_path: Path):
