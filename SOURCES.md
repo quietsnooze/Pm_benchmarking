@@ -303,6 +303,50 @@ Document URLs seen verbatim in search results (unverified by direct download):
 | Santander UK | [AR](https://www.santander.co.uk/assets/s3fs-public/documents/sanuk-2013-annual-report.pdf) | [AR](https://www.santander.co.uk/assets/s3fs-public/documents/2014_annual_report.pdf) | [AR](https://www.santander.co.uk/assets/s3fs-public/documents/santander_uk_plc_2015_annual_report_final.pdf) | [AR](https://assets.santandermedia.com/adobe/assets/urn:aaid:aem:0fcc03f2-b9cd-47d4-b8f8-9af17b06b32b/original/as/santander_uk_plc_2016_annual_report.pdf) | [announcement page](https://www.santander.co.uk/about-santander/investor-relations/stock-exchange-announcements/santander-uk-plc-2017-annual-report) | [AR](https://www.santander.co.uk/assets/s3fs-public/documents/2018_annual_report_santander_uk_plc-v2.pdf) | [Group Holdings AR](https://www.santander.co.uk/assets/s3fs-public/documents/santander_uk_group_holdings_plc_2021_annual_report_1.pdf) | [AR](https://www.santander.co.uk/assets/s3fs-public/documents/Santander%20UK%20plc%202024%20Annual%20Report.pdf) |
 | Standard Chartered | [AR (mirror)](https://www.annualreports.com/HostedData/AnnualReportArchive/s/LSE_STAN_2013.pdf) | [AR](https://www.sc.com/EN/uploads/sites/66/content/docs/Annual_Report_2014.pdf) | — | — | [AR](https://www.sc.com/EN/uploads/sites/66/content/docs/Standard-Chartered-PLC-2017-Annual-Report.pdf) | [supplementary info](https://www.sc.com/en/uploads/sites/66/content/docs/supplementary-information-2018.pdf) | [financial statements](https://www.sc.com/en/uploads/sites/66/content/docs/annual-report-2021-financial-statements-and-notes.pdf) | [AR](https://www.sc.com/en/uploads/sites/66/content/docs/standard-chartered-plc-full-year-2024-report.pdf) |
 
+### Derived table: `processed_inputs/firm_provisions_annual_reports.csv`
+
+The mortgage and unsecured-retail coverage the EBA file cannot supply (IRB
+banks report retail in one aggregate class), transcribed by hand from the
+firm annual reports / Pillar 3 disclosures above and committed as a
+long-format panel — one row per firm × ACS year × product. It complements
+the EBA-sourced commercial column; merging the two into a single annual
+panel (annual-report mortgage/retail + EBA commercial) and wiring it into
+the model is a planned follow-up, not yet done.
+
+**Columns.** `firm_name, acsyear, product ("mortgage"|"unsecured_retail"),
+allowance, gross_loans, coverage, basis ("IAS39"|"IFRS9"), entity, currency,
+source_url, source_table, source_page, notes`. Provenance attaches to every
+number (table title + page), and both the numerator (`allowance`, the
+balance-sheet impairment stock) and denominator (`gross_loans`) are kept so
+`coverage = allowance / gross_loans` can be re-derived.
+
+**Definitions.**
+
+- **Coverage** = impairment allowance (balance-sheet stock, *not* the P&L
+  charge) ÷ gross loans, per product, at the test start point (31 December of
+  the year before the ACS; Nationwide uses its nearest 4 April year-end).
+- **mortgage** = UK residential mortgages. **unsecured_retail** = credit cards
+  + personal loans + overdrafts (excludes auto/motor and secured lending).
+- **basis**: IAS 39 (incurred loss) for FY2017 and earlier; IFRS 9 (ECL) from
+  FY2018. Not comparable across the 1 Jan 2018 transition — each step flagged.
+- **entity**: group level, except where only a ring-fenced UK sub (HSBC UK
+  Bank plc, Barclays Bank UK PLC, both from 2018) gives the UK product split.
+- A firm-year that reports only a blended retail line (no mortgage/unsecured
+  split) is left blank with an explaining note — not guessed.
+
+**Tooling.** `uv run validate-annual-reports`
+(`src/uk_stress_benchmark/annual_reports.py`) loads the file, checks the
+required columns, product/basis vocabularies and numerator/denominator
+completeness, recomputes `coverage` and refuses any hand-entered ratio that
+contradicts its two figures, and flags any coverage outside its product's
+plausible band (mortgage ~0.05–0.6%, unsecured ~3–12%). Raw figures are
+mirrored, with source/unit/period/definition, in
+[appendix-detailed-data.md](appendix-detailed-data.md).
+
+**Progress.** Being filled one firm-year at a time (resumable). Done so far:
+Lloyds FY2018 (2019 ACS). Standard Chartered is excluded (no UK retail book;
+excluded from modelling).
+
 ### Checked and not usable
 
 - BoE stress-test results annexes: bank-specific *impairment charge* rates only
